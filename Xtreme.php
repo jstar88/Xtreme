@@ -19,6 +19,7 @@ class Xtreme
     private $outputModifiers;
     private $cache;
     private $compileCompression;
+    private $config;
     const HTMLCODE='<!--|html|-->';
     const PHPCODE ='/**|php|**/'; 
 
@@ -35,6 +36,11 @@ class Xtreme
         $this->outputModifiers = array();
         $this->cache = true;
         $this->compileCompression = true;
+        $this->config = array(
+        'master' => array(
+            'left' => '{', 'right' => '}'
+        )
+         );
     }
 
     public function setBaseDirectory($new)
@@ -52,6 +58,10 @@ class Xtreme
     public function setTemplateExtension($new)
     {
         $this->templateExtension = ($new{0} == '.') ? $new : '.' . $new;
+    }
+    public function setConfig($new)
+    {
+        $this->config = $new;
     }
     public function useCache($status)
     {
@@ -106,10 +116,12 @@ class Xtreme
         {
             foreach (get_object_vars($key) as $n => $v)
                 $this->data->$n = $v;
-        } else
+        } elseif(is_array($value))
         {
-            $this->data->$key = $value;
+            $this->data->$key = (object)$value;
         }
+        else
+            $this->data->$key = $value;    
     }
     
     public function set($key, $value = '')
@@ -236,9 +248,12 @@ class Xtreme
         $lines = file($string);
         $newLines = array();
         $matches = null;
+        $masterLeft=$this->config['master']['left'];
+        $masterRight=$this->config['master']['right'];
+        $regex="/\\$masterLeft([^$masterLeft$masterRight]+)\\$masterRight/";
         foreach ($lines as $line)
         {
-            $num = preg_match_all('/\{([^{}]+)\}/', $line, &$matches);
+            $num = preg_match_all($regex, $line, &$matches);
             if ($num > 0)
             {
                 for ($i = 0; $i < $num; $i++)
