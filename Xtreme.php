@@ -1,7 +1,7 @@
 <?php
 
 /*
-Xtreme 0.2 - Hight performance template engine
+Xtreme 0.3 - Hight performance template engine
 Copyright (C) 2011-2012  Covolo Nicola
 
 */
@@ -14,12 +14,13 @@ class Xtreme
     private $templateDirectories; 
     private $data; 
     private $readyCompiled;
-    private $groups;
+    private $groups_php;
     private $groups_html;
     private $outputModifiers;
     private $cache;
     private $compileCompression;
     const HTMLCODE='<!--|html|-->';
+    const PHPCODE ='/**|php|**/'; 
 
     function __construct()
     {
@@ -29,7 +30,7 @@ class Xtreme
         $this->templateExtension = '.tpl';
         $this->data = new stdClass;
         $this->readyCompiled = new stdClass;
-        $this->groups = new stdClass;
+        $this->groups_php = new stdClass;
         $this->groups_html=new stdClass;
         $this->outputModifiers = array();
         $this->cache = true;
@@ -67,7 +68,8 @@ class Xtreme
             
         $storeType='groups';
         if($type=='template'){
-            $x=0;
+            $storeType.='_php';
+            $x=Xtreme::PHPCODE;
          }
         else{
             $storeType.='_html';
@@ -147,25 +149,25 @@ class Xtreme
 
     public function clearGroups()
     {
-        $this->groups = new stdClass;
+        $this->groups_php = new stdClass;
         $this->groups_html= new stdClass;
     }
 
-    public function outputGroup($templates, $groupId, $reuse = false, $draw = false)
+    public function outputGroup($groupId,$templates, $reuse = false, $draw = false)
     {
-        if (property_exists($this->groups, $groupId)){
-          foreach ($this->groups->$groupId as $blockId => $templateName)
+        if (property_exists($this->groups_php, $groupId)){
+          foreach ($this->groups_php->$groupId as $blockId => $templateName)
             {
-                $this->assign($blockId, file_get_contents($this->getTplPath($templateName)));
+                $this->assign($blockId, $this->compile(file_get_contents($this->getTplPath($templateName))));
              }
-             unset($this->groups->$groupId);
+             
         }
         if (property_exists($this->groups_html, $groupId)){
             foreach ($this->groups_html->$groupId as $blockId => $html)
             {
                 $this->assign($blockId, $html);
              }
-             unset($this->groups_html->$groupId);
+             
         }
         return $this->output($templates);
     }
@@ -229,9 +231,9 @@ class Xtreme
         return $out;
     }
 
-    private function compile($templateFile)
+    private function compile($string)
     {
-        $lines = file($templateFile);
+        $lines = file($string);
         $newLines = array();
         $matches = null;
         foreach ($lines as $line)
@@ -331,8 +333,10 @@ class Xtreme
             default:
                 if(substr ($parts[0],0,strlen(Xtreme::HTMLCODE))==Xtreme::HTMLCODE)
                   $string = $parts[0];
+                elseif(substr ($parts[0],0,strlen(Xtreme::PHPCODE))==Xtreme::PHPCODE)
+                   $string = '<?php echo ' .$parts[0].' ?>';  
                 else
-                  $string = '<?php echo ' . preg_replace($from, $to, $parts[0]) . '; ?>';
+                    $string = '<?php echo ' . preg_replace($from, $to, $parts[0]) . '; ?>';
                 break;
         }
         return $string;
