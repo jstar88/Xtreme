@@ -246,11 +246,10 @@ class Xtreme
         $matches = null;
         $masterLeft=$this->config['master']['left'];
         $masterRight=$this->config['master']['right'];
-       // $regex='/\'.$masterLeft.'([^'.$masterLeft$masterRight.']+)\'.$masterRight.'/';
-      //  $regex='/\{([^{}]+)\}/';
+        $regex='/\\'.$masterLeft.'([^'.$masterLeft.$masterRight.']+)\\'.$masterRight.'/';
         foreach ($lines as $line)
         {
-            $num = preg_match_all('/\{([^{}]+)\}/', $line, &$matches);
+            $num = preg_match_all($regex, $line, &$matches);
             if ($num > 0)
             {
                 for ($i = 0; $i < $num; $i++)
