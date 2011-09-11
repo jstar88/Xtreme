@@ -25,7 +25,7 @@ class Xtreme
 
     function __construct()
     {
-        $this->baseDirectory = $this->appendSeparator($_SERVER['DOCUMENT_ROOT']); 
+        $this->baseDirectory = $this->appendSeparator(dirname(__FILE__)); 
         $this->compileDirectory = $this->baseDirectory;
         $this->templateDirectories = $this->baseDirectory;
         $this->templateExtension = '.tpl';
@@ -79,11 +79,9 @@ class Xtreme
         $storeType='groups';
         if($type=='template'){
             $storeType.='_php';
-            $x=Xtreme::PHPCODE;
          }
         else{
             $storeType.='_html';
-            $x=Xtreme::HTMLCODE; 
          }
         if (!property_exists($this->$storeType, $groupId))
             $this->$storeType->$groupId = array();    
@@ -91,17 +89,14 @@ class Xtreme
         if (is_array($blockId))
         {
             foreach ($blockId as $n => $v){
-                $v=$x.$v;
                 $this->$storeType->$groupId[$n] = $v;
             }
         } elseif (is_object($blockId))
         {
             foreach (get_object_vars($blockId) as $n => $v)
-                $v=$x.$v;
                 $this->$storeType->$groupId[$n] = $v;
         } else
         {
-            $templateName=$x.$templateName;
             $this->$storeType->$groupId[$blockId] = $templateName;
         } 
     }       
@@ -167,17 +162,18 @@ class Xtreme
 
     public function outputGroup($groupId,$templates, $reuse = false, $draw = false)
     {
+        
         if (property_exists($this->groups_php, $groupId)){
           foreach ($this->groups_php->$groupId as $blockId => $templateName)
             {
-                $this->assign($blockId, $this->compile(file_get_contents($this->getTplPath($templateName))));
+                $this->assign($blockId, Xtreme::PHPCODE.$this->compile(file_get_contents($this->getTplPath($templateName))));
              }
              
         }
         if (property_exists($this->groups_html, $groupId)){
             foreach ($this->groups_html->$groupId as $blockId => $html)
             {
-                $this->assign($blockId, $html);
+                $this->assign($blockId, Xtreme::HTMLCODE.$html);
              }
              
         }
@@ -250,10 +246,11 @@ class Xtreme
         $matches = null;
         $masterLeft=$this->config['master']['left'];
         $masterRight=$this->config['master']['right'];
-        $regex="/\\$masterLeft([^$masterLeft$masterRight]+)\\$masterRight/";
+       // $regex='/\'.$masterLeft.'([^'.$masterLeft$masterRight.']+)\'.$masterRight.'/';
+      //  $regex='/\{([^{}]+)\}/';
         foreach ($lines as $line)
         {
-            $num = preg_match_all($regex, $line, &$matches);
+            $num = preg_match_all('/\{([^{}]+)\}/', $line, &$matches);
             if ($num > 0)
             {
                 for ($i = 0; $i < $num; $i++)
@@ -309,8 +306,9 @@ class Xtreme
     private function transformSyntax($input)
     {
         $from = array( 
-        '/(^|\[|,|\(|\+| )([a-zA-Z_][a-zA-Z0-9_]*)($|\.|\)|\[|\]|\+)/', '/(^|\[|,|\(|\+| )([a-zA-Z_][a-zA-Z0-9_]*)($|\.|\)|\[|\]|\+)/',
-            '/\./', );
+         '/(^|\,|\(|\+| )([a-zA-Z_][a-zA-Z0-9_]*)($|\.|\)|\->|\+)/',
+         '/(^|\,|\(|\+| )([a-zA-Z_][a-zA-Z0-9_]*)($|\.|\)|\->|\+)/',
+         '/\./', );
         $to = array('$1$this->data->$2$3', '$1$this->data->$2$3', '->');
 
         $parts = explode(':', $input);
@@ -330,7 +328,7 @@ class Xtreme
                 if (sizeof($pieces) == 3)
 
                     $string .= '=>' . preg_replace($from, $to, $pieces[2]);
-                $string .= ') { ' ?>';
+                $string .= ') {  ?>';
                 break;
             case 'end':
             case 'endswitch':

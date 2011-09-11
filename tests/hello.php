@@ -4,8 +4,9 @@
  * */
 include(dirname(__FILE__).DIRECTORY_SEPARATOR.'../Xtreme.php');
 $xtreme=new Xtreme();
-$xtreme->setCompileDirectory('tmp/');
-$xtreme->setTemplateDirectories('templates/');
+$xtreme->setBaseDirectory(dirname(__FILE__));
+$xtreme->setCompileDirectory('tmp');
+$xtreme->setTemplateDirectories('templates');
 $xtreme->assign('key','Hello world!');
 $xtreme->output('hello',false,true);
 ?>
