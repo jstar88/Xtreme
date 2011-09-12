@@ -20,8 +20,6 @@ class Xtreme
     private $cache;
     private $compileCompression;
     private $config;
-    const HTMLCODE='<!--|html|-->';
-    const PHPCODE ='/**|php|**/'; 
 
     function __construct()
     {
@@ -166,14 +164,14 @@ class Xtreme
         if (property_exists($this->groups_php, $groupId)){
           foreach ($this->groups_php->$groupId as $blockId => $templateName)
             {
-                $this->assign($blockId, Xtreme::PHPCODE.$this->compile(file_get_contents($this->getTplPath($templateName))));
+                $this->assign($blockId, $this->compile($this->getTplPath($templateName)));
              }
              
         }
         if (property_exists($this->groups_html, $groupId)){
             foreach ($this->groups_html->$groupId as $blockId => $html)
             {
-                $this->assign($blockId, Xtreme::HTMLCODE.$html);
+                $this->assign($blockId, $html);
              }
              
         }
@@ -312,6 +310,8 @@ class Xtreme
 
         $parts = explode(':', $input);
 
+        //print_r($parts);
+
         $string = '';
         switch ($parts[0])
         { 
@@ -342,13 +342,11 @@ class Xtreme
             case 'include':
                 $string = '<?php echo $this->output("' . $parts[1] . '"); ?>';
                 break;
+            case 'group':
+                $string =  $this->data->$parts[1];
+                break;
             default:
-                if(substr ($parts[0],0,strlen(Xtreme::HTMLCODE))==Xtreme::HTMLCODE)
-                  $string = $parts[0];
-                elseif(substr ($parts[0],0,strlen(Xtreme::PHPCODE))==Xtreme::PHPCODE)
-                   $string = '<?php echo ' .$parts[0].' ?>';  
-                else
-                    $string = '<?php echo ' . preg_replace($from, $to, $parts[0]) . '; ?>';
+                $string = '<?php echo ' . preg_replace($from, $to, $parts[0]) . '; ?>';
                 break;
         }
         return $string;

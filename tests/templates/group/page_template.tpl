@@ -1,8 +1,8 @@
 <html >
 <head>
-{head}
+{group:head}
 </head>
 <body>
-{body}
+{group:body}
 </body>
 </html>
