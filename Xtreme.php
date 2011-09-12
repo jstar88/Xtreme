@@ -84,20 +84,20 @@ class Xtreme
             $storeType.='_html';
          }
         if (!property_exists($this->$storeType, $groupId))
-            $this->$storeType->$groupId = array();    
+            $this->$storeType->{$groupId} = array();    
 
         if (is_array($blockId))
         {
             foreach ($blockId as $n => $v){
-                $this->$storeType->$groupId[$n] = $v;
+                $this->$storeType->{$groupId}[$n] = $v;
             }
         } elseif (is_object($blockId))
         {
             foreach (get_object_vars($blockId) as $n => $v)
-                $this->$storeType->$groupId[$n] = $v;
+                $this->$storeType->{$groupId}[$n] = $v;
         } else
         {
-            $this->$storeType->$groupId[$blockId] = $templateName;
+            $this->$storeType->{$groupId}[$blockId] = $templateName;
         } 
     }       
     
