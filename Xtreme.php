@@ -1,7 +1,7 @@
 <?php
 
 /*
-Xtreme 0.3 - Hight performance template engine
+Xtreme 0.4 - Hight performance template engine
 Copyright (C) 2011-2012  Covolo Nicola
 
 */
@@ -10,6 +10,7 @@ class Xtreme
 {
     private $baseDirectory; 
     private $compileDirectory; 
+    private $langDirectory;
     private $templateExtension;
     private $templateDirectories; 
     private $data; 
@@ -20,12 +21,16 @@ class Xtreme
     private $cache;
     private $compileCompression;
     private $config;
+    const GROUPS_CACHE_POSTFIX='_group';
+    const TEMPLATE_CACHE_DIRECTORY='templates/';
+    const LANG_CACHE_DIRECTORY='langs/';
 
     function __construct()
     {
         $this->baseDirectory = $this->appendSeparator(dirname(__FILE__)); 
         $this->compileDirectory = $this->baseDirectory;
         $this->templateDirectories = $this->baseDirectory;
+        $this->langDirectory=$this->baseDirectory;
         $this->templateExtension = '.tpl';
         $this->data = new stdClass;
         $this->readyCompiled = new stdClass;
@@ -49,6 +54,10 @@ class Xtreme
     {
         $this->compileDirectory = $this->compilePath($new);
     }
+    public function setLangDirectory($new)
+    {
+        $this->langDirectory = $this->compilePath($new);
+    }
     public function setTemplateDirectories($new)
     {
         $this->templateDirectories = $this->compilePath($new);
@@ -68,6 +77,21 @@ class Xtreme
     public function useCompileCompression($status)
     {
         $this->compileCompression = $status;
+    }
+    
+    public function assignLangFile($path){
+        $langPath=$this->getLangPath($path);
+        $langCompiledPath=$this->getCompiledPath($path,false);
+        $lang='';
+        if(file_exists($langCompiledPath)){
+            require($langCompiledPath);    
+        }
+        elseif(file_exists($langPath)){
+            $lang= parse_ini_string(file_get_contents($langPath));
+        }
+        else
+           die('Lang (' . $langPath . ') not found '); 
+        $this->assign($lang);     
     }
 
 
@@ -175,7 +199,7 @@ class Xtreme
              }
              
         }
-        return $this->output($templates);
+        return $this->output($templates.Xtreme::GROUPS_CACHE_POSTFIX);
     }
 
     public function output($templates, $reuse = false, $draw = false)
@@ -187,6 +211,7 @@ class Xtreme
         {
             $compiledFile = $this->getCompiledPath($template);
             $templateFile = $this->getTplPath($template);
+            
             if (isset($this->readyCompiled->$template) && $reuse)
                 $out .= $this->readyCompiled->$template;
             elseif (file_exists($compiledFile) && filemtime($compiledFile) >= filemtime($templateFile) && $this->cache)
@@ -222,11 +247,17 @@ class Xtreme
     }
     private function getTplPath($template)
     {
-        return $this->templateDirectories . $template . $this->templateExtension;
+        return ($this->templateDirectories). $template . ($this->templateExtension);
     }
-    private function getCompiledPath($template)
+    private function getCompiledPath($path,$isTemplate=true)
     {
-        return $this->compileDirectory . $template . '.php';
+        if($isTemplate)
+            return ($this->compileDirectory) .(Xtreme::TEMPLATE_CACHE_DIRECTORY). $path . '.php';
+        return ($this->compileDirectory) .(Xtreme::LANG_CACHE_DIRECTORY). $path . '.php'; 
+    }
+    private function getLangPath($langini)
+    {
+        return ($this->langDirectory) . $langini . '.ini';
     }
 
     private function bufferedOutput($compiledFile)
@@ -283,10 +314,13 @@ class Xtreme
     }
 
 
-    private function save($template, $compiledFile, $value)
+    private function save($templatePath, $compiledFile, $value,$isTemplate=true)
     {
-        $folders = explode(DIRECTORY_SEPARATOR, $template);
-        $temp = $this->compileDirectory;
+        if($isTemplate)
+            $temp = ( $this->compileDirectory ). Xtreme::TEMPLATE_CACHE_DIRECTORY;
+        else
+            $temp = ( $this->compileDirectory ). Xtreme::LANG_CACHE_DIRECTORY;    
+        $folders = explode(DIRECTORY_SEPARATOR, $templatePath);
         $i = -1;
         $count = count($folders);
         while ($i < $count - 1)

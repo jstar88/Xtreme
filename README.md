@@ -9,14 +9,17 @@ Why choose **Xtreme**?
 - integrate it easily
 - customizable tags
 - very clean and userfriendly syntax
+- possibility to use language files _.ini_
 - full paths controll 
  - base directory
  - templates directory
  - compiled directory
+ - lang directory
 - full cache controll
- - store templates compiled in _hdd _automatically 
- - store templates compiled _inside _ Xtreme for next usage 
- - implode different templates in one compiled to decrease hdd traffic
+ - store lang files in _hdd_ automatically
+ - store templates compiled in _hdd_ automatically 
+ - store templates compiled _inside_ Xtreme for next usage 
+ - implode different templates in _one_ compiled to decrease hdd traffic
  - compress templates compiled to gain performance and less space usage
 - useful tag functions like if,else,for
 - fast rendering
