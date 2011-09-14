@@ -84,10 +84,11 @@ class Xtreme
         $langCompiledPath=$this->getCompiledPath($path,false);
         $lang='';
         if(file_exists($langCompiledPath)){
-            require($langCompiledPath);    
+            $lang=json_decode(file_get_contents($langPath),true);   
         }
         elseif(file_exists($langPath)){
             $lang= parse_ini_string(file_get_contents($langPath));
+            $this->save($path,$langCompiledPath,json_encode($lang),false);
         }
         else
            die('Lang (' . $langPath . ') not found '); 
