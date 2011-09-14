@@ -79,15 +79,22 @@ class Xtreme
         $this->compileCompression = $status;
     }
     
+    public function getKey($key){
+        return $this->data->$key;
+    }
+    
     public function assignLangFile($path){
         $langPath=$this->getLangPath($path);
         $langCompiledPath=$this->getCompiledPath($path,false);
         $lang='';
         if(file_exists($langCompiledPath)){
-            $lang=json_decode(file_get_contents($langPath),true);   
+            $lang=json_decode(file_get_contents($langCompiledPath),true);   
         }
         elseif(file_exists($langPath)){
-            $lang= parse_ini_string(file_get_contents($langPath));
+            if(function_exists('parse_ini_string'))
+                $lang= parse_ini_string(file_get_contents($langPath),true);
+            else
+                $lang= parse_ini_file($langPath,true);
             $this->save($path,$langCompiledPath,json_encode($lang),false);
         }
         else
@@ -254,7 +261,7 @@ class Xtreme
     {
         if($isTemplate)
             return ($this->compileDirectory) .(Xtreme::TEMPLATE_CACHE_DIRECTORY). $path . '.php';
-        return ($this->compileDirectory) .(Xtreme::LANG_CACHE_DIRECTORY). $path . '.php'; 
+        return ($this->compileDirectory) .(Xtreme::LANG_CACHE_DIRECTORY). $path . '.json'; 
     }
     private function getLangPath($langini)
     {
@@ -317,11 +324,12 @@ class Xtreme
 
     private function save($templatePath, $compiledFile, $value,$isTemplate=true)
     {
-        if($isTemplate)
-            $temp = ( $this->compileDirectory ). Xtreme::TEMPLATE_CACHE_DIRECTORY;
-        else
-            $temp = ( $this->compileDirectory ). Xtreme::LANG_CACHE_DIRECTORY;    
+        $temp = $this->compileDirectory ;
         $folders = explode(DIRECTORY_SEPARATOR, $templatePath);
+        if($isTemplate)
+            array_unshift($folders,Xtreme::TEMPLATE_CACHE_DIRECTORY);
+        else
+            array_unshift($folders,Xtreme::LANG_CACHE_DIRECTORY);
         $i = -1;
         $count = count($folders);
         while ($i < $count - 1)
