@@ -1,7 +1,7 @@
 <?php
 
 /*
-Xtreme 0.4 - Hight performance template engine
+Xtreme 0.5 - Hight performance template engine
 Copyright (C) 2011-2012  Covolo Nicola
 
 */
@@ -12,7 +12,8 @@ class Xtreme
     //----don't change these!----
     const SHOW_TAG='SHOW_TAG';
     const HIDE_TAG='HIDE_TAG';
-    const DELETE_TAG='DELETE_TAG';   
+    const DELETE_TAG='DELETE_TAG'; 
+    const PHP='PHP';  
     const JSON='JSON';
     const XML='XML';
     const INI='INI';
@@ -107,23 +108,31 @@ class Xtreme
         $this->compileCompression = $status;
     }
     
-    public function assignLangFile($path){
+    public function assignLangFile($path,$phpVar='lang'){
         $langPath=$this->getLangPath($path);
         $langCompiledPath=$this->getCompiledPath($path,false);
         $lang='';
         
-        if($this->langExtension!=self::JSON && file_exists($langCompiledPath)){
+        if(defined("LANG_{$path}_INSIDE"))
+            return;
+        
+        if($this->langExtension!=self::PHP && file_exists($langCompiledPath)){
             $lang=$this->open_JSON($langCompiledPath);   
         }
         elseif(file_exists($langPath)){
             $function="open_".$this->langExtension;
             $lang=$this->$function();
-            if($this->langExtension!=self::JSON)
-                $this->save($path,$langCompiledPath,json_encode($lang),false);
+            $this->save($path,$langCompiledPath,json_encode($lang),false); 
         }
         else
            die('Lang (' . $langPath . ') not found '); 
+        define("LANG_{$path}_INSIDE",true);
         $this->assign($lang);     
+    }
+    private function open_PHP($path,$phpVar)
+    {
+        require($path);
+        return $$phpVar;           
     }
     private function open_JSON($path)
     {
