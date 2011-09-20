@@ -452,8 +452,7 @@ class Xtreme
                         $return='{'.$key.'['.$index.']}';
                     break;
                 default:
-                    break;
-                
+                    break;              
             }
             return $return;               
         } 
