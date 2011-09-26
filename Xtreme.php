@@ -22,7 +22,7 @@ class Xtreme
     const GROUPS_CACHE_POSTFIX='_group';
     const TEMPLATE_CACHE_DIRECTORY='templates/';
     const LANG_CACHE_DIRECTORY='langs/';        
-    const DEFAULT_TEMPLATE='.tpl';
+    const DEFAULT_TEMPLATE='tpl';
     const DEFAULT_MASTER_LEFT='{';
     const DEFAULT_MASTER_RIGHT='}';    
     const DEFAULT_LANG_EXTENSION=self::JSON;
@@ -51,7 +51,7 @@ class Xtreme
         $this->templateDirectories = $this->baseDirectory;
         $this->langDirectory=$this->baseDirectory;
         $this->templateExtension = self::DEFAULT_TEMPLATE;
-        $this->langExtension = $this->setLangExtension(self::DEFAULT_LANG_EXTENSION);
+        $this->langExtension = self::DEFAULT_LANG_EXTENSION;
         $this->data = new stdClass;
         $this->readyCompiled = new stdClass;
         $this->groups_php = new stdClass;
@@ -61,7 +61,7 @@ class Xtreme
         $this->compileCompression = true;
         $this->config = array(
         'master' => array(
-            'left' => DEFAULT_MASTER_LEFT, 'right' => DEFAULT_MASTER_RIGHT
+            'left' => self::DEFAULT_MASTER_LEFT, 'right' => self::DEFAULT_MASTER_RIGHT
             )
          );
          $this->onInexistenceTag=self::HIDE_TAG;
@@ -89,7 +89,7 @@ class Xtreme
     }
     public function setLangExtension($new)
     {
-        $this->langExtension = self::$new;
+        $this->langExtension = constant("self::$new");
     }
     public function setConfig($new)
     {
@@ -97,7 +97,7 @@ class Xtreme
     }
     public function setOnInexistenceTagEvent($new)
     {
-        $this->onInexistenceTag=self::$new;       
+        $this->onInexistenceTag=constant("self::$new");     
     }
     public function useCache($status)
     {
@@ -121,7 +121,7 @@ class Xtreme
         }
         elseif(file_exists($langPath)){
             $function="open_".$this->langExtension;
-            $lang=$this->$function();
+            $lang=$this->$function($langPath);
             $this->save($path,$langCompiledPath,json_encode($lang),false); 
         }
         else
@@ -334,10 +334,11 @@ class Xtreme
         $matches = null;
         $masterLeft=$this->config['master']['left'];
         $masterRight=$this->config['master']['right'];
-        $regex='/\\'.$masterLeft.'([^'.$masterLeft.$masterRight.']+)\\'.$masterRight.'/';
+        $regex="/\\{$masterLeft}([^{$masterLeft}{$masterRight}]+)\\{$masterRight}/";
+        
         foreach ($lines as $line)
         {
-            $num = preg_match_all($regex, $line, &$matches);
+            $num = preg_match_all($regex, $line, &$matches); 
             if ($num > 0)
             {
                 for ($i = 0; $i < $num; $i++)
@@ -402,8 +403,6 @@ class Xtreme
         $to = array('$1$this->get($2$3)',  '->');
 
         $parts = explode(':', $input);
-
-        //print_r($parts);
 
         $string = '';
         switch ($parts[0])
