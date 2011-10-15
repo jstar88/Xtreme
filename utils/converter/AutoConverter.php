@@ -13,5 +13,6 @@ class AutoConverter extends Converter
       parent::setTargetFile($info['path'].$info['name']);
       parent::convert();     
    }
+   
 }
 ?>
