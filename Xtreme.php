@@ -1,7 +1,7 @@
 <?php
 
 /*
-Xtreme 0.5 - Hight performance template engine
+Xtreme 0.6 - Hight performance template engine
 Copyright (C) 2011-2012  Covolo Nicola
 
 */
@@ -71,7 +71,7 @@ class Xtreme
 
     public function setBaseDirectory($new)
     {
-        $this->baseDirectory = $this->compilePath($new);
+        $this->baseDirectory = $this->appendSeparator($new);
     }
     public function setCompileDirectory($new)
     {
