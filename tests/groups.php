@@ -3,21 +3,21 @@
  * advanced:groups usage
  * */
 include(dirname(__FILE__).DIRECTORY_SEPARATOR.'../Xtreme.php');
-$xtreme=new Xtreme();
-$xtreme->setBaseDirectory(dirname(__FILE__));
-$xtreme->setCompileDirectory('tmp');
-$xtreme->setTemplateDirectories('templates');
+Xtreme::init();
+Xtreme::setBaseDirectory(dirname(__FILE__));
+Xtreme::setCachesDirectory('tmp');
+Xtreme::setTemplatesDirectory('templates');
 
-$xtreme->assign('title','html page');
-$xtreme->assignToGroup('x','head','group/head_template');
+Xtreme::assign('title','html page');
+Xtreme::assignToGroup('x','head','group/head_template');
 
-$xtreme->assign('title1','name');
-$xtreme->assign('title2','age');
-$xtreme->assign('value1','Frank');
-$xtreme->assign('value2','28');
-$xtreme->assignToGroup('x','body','group/body_template');
+Xtreme::assign('title1','name');
+Xtreme::assign('title2','age');
+Xtreme::assign('value1','Frank');
+Xtreme::assign('value2','28');
+Xtreme::assignToGroup('x','body','group/body_template');
 
-echo $xtreme->outputGroup('x','group/page_template');
+echo Xtreme::outputGroup('x','group/page_template');
 
 
 ?>

@@ -3,15 +3,15 @@
  *A simple example of array usage
  * */
 include(dirname(__FILE__).DIRECTORY_SEPARATOR.'../Xtreme.php');
-$xtreme=new Xtreme();
-$xtreme->setBaseDirectory(dirname(__FILE__));
-$xtreme->setCompileDirectory('tmp');
-$xtreme->setTemplateDirectories('templates');
+Xtreme::init();
+Xtreme::setBaseDirectory(dirname(__FILE__));
+Xtreme::setCachesDirectory('tmp');
+Xtreme::setTemplatesDirectory('templates');
 
 $array=array('key1'=>'apple','key2'=>'pear');
 $array2=array('key3'=>'strawberry','key4'=>'plum');
-$xtreme->assign($array);
-$xtreme->assign('key',$array2);
-$html=$xtreme->output('fruits');
+Xtreme::assign($array);
+Xtreme::assign('key',$array2);
+$html=Xtreme::output('fruits');
 echo $html;
 ?>

@@ -6,7 +6,7 @@
 <body>
 {key1}
 {key2}
-{key->key3}
-{key->key4}
+{key.key3}
+{key.key4}
 </body>
 </html>
