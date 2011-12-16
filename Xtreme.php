@@ -17,6 +17,16 @@
  * -> now you can choose to throw an exception if a key in template don't exist in language file;
  * -> automatic OS-dipendent path separators replacement;
  * -> cache saved in php formatt for better performance;
+ * @version 2.1
+ * -> fixed a performance issue;
+ * -> fixed the return string parsing an int number like function argument;
+ * -> added some functions for test;  
+ * -> more configurable template syntax;
+ * -> replaced all object with array for better performance;
+ * @version 2.2
+ * -> internal structure merged from 3 to 1 array for better performance;
+ * -> loop in template from php;
+ * -> callback structure for the compile task
  */
 abstract class Xtreme
 {
@@ -31,7 +41,7 @@ abstract class Xtreme
     const XML = 'XML';
     const INI = 'INI';
     //---------------------------
-    
+
     const TEMPLATE_CACHE_DIRECTORY = 'templates';
     const LANG_CACHE_DIRECTORY = 'langs';
     const DEFAULT_TEMPLATE = 'tpl';
@@ -40,15 +50,15 @@ abstract class Xtreme
     const DEFAULT_ARRAY_LINK = '.';
     const DEFAULT_LANG_EXTENSION = self::JSON;
     const DEFAULT_LANGCACHE_ARRAYNAME = 'lang';
+    const DEFAULT_FILE_PERMISSION = 0755;
 
 
     //--------only internal usage
     private static $groups_template;
-    private static $groups_php;
-    private static $groups_html;
     private static $languages;
     private static $readyCompiled;
-    private static $currentMainName;
+    private static $hdd_access;
+    private static $fList;
 
     //--------external dependency
     private static $baseDirectory;
@@ -63,6 +73,7 @@ abstract class Xtreme
     private static $onInexistenceTag;
     private static $country;
     private static $langCacheArrayName;
+    private static $filePermission;
 
     /**
      * Xtreme::init()
@@ -79,16 +90,16 @@ abstract class Xtreme
         self::$langExtension = self::DEFAULT_LANG_EXTENSION;
         self::$langCacheArrayName = self::DEFAULT_LANGCACHE_ARRAYNAME;
         self::$readyCompiled = array();
-        self::$groups_template = new stdClass;
-        self::$groups_php = new stdClass;
-        self::$groups_html = new stdClass;
+        self::$groups_template = array();
         self::$useCache = true;
         self::$useCompileCompression = true;
         self::$config = array('master' => array('left' => self::DEFAULT_MASTER_LEFT, 'right' => self::DEFAULT_MASTER_RIGHT), 'arrayLink' => self::DEFAULT_ARRAY_LINK);
         self::$onInexistenceTag = self::HIDE_TAG;
         self::$country = '';
         self::$languages = array();
-        self::$currentMainName = '';
+        self::$hdd_access = 0;
+        self::$fList = array();
+        self::$filePermission = self::DEFAULT_FILE_PERMISSION;
     }
     //-------------PATH FUNCTIONS---------------
     /**
@@ -324,7 +335,7 @@ abstract class Xtreme
      */
     public static function switchCountry($country, $cleanOld = false)
     {
-        $country = $self::sanitizeFoolder($country);
+        $country = self::sanitizeFoolder($country);
         if ($cleanOld && isset(self::$languages[$country]))
         {
             unset(self::$languages[$country]);
@@ -332,8 +343,21 @@ abstract class Xtreme
         self::$country = $country;
         if (!isset(self::$languages[$country]))
         {
-            self::$languages[$country] = new stdClass();
+            self::$languages[$country] = array();
         }
+    }
+
+    /**
+     * Xtreme::setFilePermission()
+     * Function used to set the file and folder permission when created.
+     * Default: 0755
+     * 
+     * @param mixed $id
+     * @return nul
+     */
+    public static function setFilePermission($id)
+    {
+        self::$filePermission = $id;
     }
     //------------------------------------------
 
@@ -343,12 +367,12 @@ abstract class Xtreme
         $numargs = func_num_args();
         $arg_list = func_get_args();
         if ($numargs == 0)
-            throw exception ('Function get() must be called with at least 1 arguments');
-        if (!property_exists(self::$languages[self::$country], $arg_list[0]))
+            throw new Exception('Function get() must be called with at least 1 arguments');
+        if (!isset(self::$languages[self::$country][$arg_list[0]]))
         {
             return self::errorManagement($arg_list, $numargs);
         }
-        $return = self::$languages[self::$country]->$arg_list[0];
+        $return = self::$languages[self::$country][$arg_list[0]];
         for ($i = 1; $i < $numargs; $i++)
         {
             if (!isset($return[$arg_list[$i]]))
@@ -364,7 +388,12 @@ abstract class Xtreme
     {
         $return = $arg_list[0];
         for ($i = 1; $i < $numargs; $i++)
-            $return .= '[' . $arg_list[$i] . ']';
+        {
+            $param = $arg_list[$i];
+            if (!is_numeric($param))
+                $param = "'$param'";
+            $return .= "[$param]";
+        }
         return $return;
     }
     private static function errorManagement($arg_list, $numargs)
@@ -385,7 +414,7 @@ abstract class Xtreme
                 break;
             case self::THROW_EXCEPTION:
                 $desc = self::buildArrayString($arg_list, $numargs);
-                throw exception ('Tryed to access to null language reference: ' . $desc);
+                throw new Exception('Tryed to access to null language reference: ' . $desc);
                 break;
             default:
                 break;
@@ -406,8 +435,6 @@ abstract class Xtreme
         $langPath = self::getLangPath($path);
         $langCompiledPath = self::getCompiledLangPath($path);
         $lang = '';
-        if (defined("LANG_{$path}_INSIDE"))
-            return;
         if (self::$langExtension != self::PHP)
         {
             if (file_exists($langCompiledPath))
@@ -417,7 +444,7 @@ abstract class Xtreme
             {
                 $function = "open_" . self::$langExtension;
                 $lang = self::$function($langPath, $phpVars);
-                $self::saveAsPHP($langCompiledPath, $lang);
+                self::saveAsPHP($langCompiledPath, $lang);
             }
             else
                 die('Lang (' . $langPath . ') not found ');
@@ -427,7 +454,6 @@ abstract class Xtreme
             $lang = self::open_PHP($langPath, $phpVars);
         }
         self::assign($lang);
-        define("LANG_{$path}_INSIDE", true);
     }
 
     /* @example
@@ -449,21 +475,21 @@ abstract class Xtreme
         if (is_array($key))
         {
             foreach ($key as $n => $v)
-                self::$languages[self::$country]->$n = $v;
+                self::$languages[self::$country][$n] = $v;
         } elseif (is_object($key))
         {
 
             foreach (get_object_vars($key) as $n => $v)
-                self::$languages[self::$country]->$n = $v;
+                self::$languages[self::$country][$n] = $v;
         } elseif (is_array($value))
         {
             foreach ($value as $k => $v)
             {
-                self::$languages[self::$country]->{$key}[$k] = $v;
+                self::$languages[self::$country][$key][$k] = $v;
             }
         }
         else
-            self::$languages[self::$country]->$key = $value;
+            self::$languages[self::$country][$key] = $value;
     }
 
     /**
@@ -476,11 +502,11 @@ abstract class Xtreme
      */
     public static function append($key, $value = '')
     {
-        if (!property_exists(self::$languages[self::$country], $key))
+        if (!isset(self::$languages[self::$country][$key]))
         {
-            self::$languages[self::$country]->$key = '';
+            self::$languages[self::$country][$key] = '';
         }
-        self::$languages[self::$country]->$key .= $value;
+        self::$languages[self::$country][$key] .= $value;
     }
 
     /**
@@ -493,13 +519,13 @@ abstract class Xtreme
      */
     public static function push($key, $value = null)
     {
-        if (!property_exists(self::$languages[self::$country], $key))
+        if (!isset(self::$languages[self::$country][$key]))
         {
-            self::$languages[self::$country]->$key = array();
+            self::$languages[self::$country][$key] = array();
         }
-        $data = self::$languages[self::$country]->$key;
+        $data = self::$languages[self::$country][$key];
         $data[] = $value;
-        self::$languages[self::$country]->$key = $data;
+        self::$languages[self::$country][$key] = $data;
     }
 
     /**
@@ -533,12 +559,21 @@ abstract class Xtreme
             if (isset(self::$readyCompiled[$compiledTemplateFile]) && $reuse)
                 $out .= self::$readyCompiled[$compiledTemplateFile]['code'];
             elseif (file_exists($compiledTemplateFile) && filemtime($compiledTemplateFile) >= filemtime($templateFile) && self::$useCache)
-                $out .= self::bufferedOutput($compiledTemplateFile);
-            elseif (file_exists($templateFile))
+            {
+                $tmp = self::bufferedOutput($compiledTemplateFile);
+                $out .= $tmp;
+                if ($reuse)
+                {
+                    self::$readyCompiled[$compiledTemplateFile]['code'] = $tmp;
+                }
+            } elseif (file_exists($templateFile))
             {
                 if ($forGroup)
+                {
                     self::compileGroup($groupId);
-                self::save($compiledTemplateFile, self::compile($templateFile));
+                }
+                $phpcont = self::compile($templateFile);
+                self::save($compiledTemplateFile, $phpcont);
                 $tmp = self::bufferedOutput($compiledTemplateFile);
                 $out .= $tmp;
                 if ($reuse)
@@ -553,9 +588,11 @@ abstract class Xtreme
             return $out;
         echo $out;
     }
-    public static function assignForReuse($templateName, $key, $value = 'null')
+    public static function assignForReuse($templateName, $key, $value = null)
     {
         //if cache don't exist then this is a pre-assign
+        $templateName = self::getCompiledTplPath($templateName);
+
         if (!isset(self::$readyCompiled[$templateName]))
         {
             self::assign($key, $value);
@@ -572,61 +609,55 @@ abstract class Xtreme
                     self::replaceCacheValues($templateName, $n, $v);
             } elseif (is_array($value))
             {
-                self::replaceCacheValues($templateName, $key, (object)$value);
+                foreach ($value as $n => $v)
+                    self::replaceCacheValues($templateName, $n, $v);
             }
             else
+            {
                 self::replaceCacheValues($templateName, $key, $value);
+            }
         }
+
     }
 
-    public static function assignToGroup($groupId, $blockId, $templateName = '', $type = 'template')
+    public static function assignToGroup($groupId, $blockId, $templateName = '')
     {
 
-        $storeType = 'groups';
-        if ($type == 'template')
-        {
-            $storeType .= '_template';
-        }
-        else
-        {
-            $storeType .= '_html';
-        }
-        if (!property_exists(self::$$storeType, $groupId))
-            self::$$storeType->{$groupId} = array();
+        if (!isset(self::$groups_template[$groupId]))
+            self::$groups_template[$groupId] = array();
 
         if (is_array($blockId))
         {
             foreach ($blockId as $n => $v)
             {
-                self::$$storeType->{$groupId}[$n] = $v;
+                self::$groups_template[$groupId][$n]['template'] = self::getTplPath($v);
             }
         } elseif (is_object($blockId))
         {
             foreach (get_object_vars($blockId) as $n => $v)
-                self::$$storeType->{$groupId}[$n] = $v;
+                self::$groups_template[$groupId][$n]['template'] = self::getTplPath($v);
         }
         else
         {
-            self::$$storeType->{$groupId}[$blockId] = $templateName;
+            self::$groups_template[$groupId][$blockId]['template'] = self::getTplPath($templateName);
         }
-    }
-    public static function setCurrentMain($main)
-    {
-        self::$currentMainName = $main;
     }
     public static function assignGroupToGroup($startGroup, $startTemplate, $toGroup, $key)
     {
         $startTemplate = self::getTplPath($startTemplate);
         $CacheName = self::getGroupCacheName($startGroup, $startTemplate);
-        if (!property_exists(self::$groups_php, $toGroup))
-            self::$groups_php->{$toGroup} = array();
-        self::$groups_php->{$toGroup}[$key]['cacheName'] = $CacheName;
-        self::$groups_php->{$toGroup}[$key]['children_group'] = $startGroup;
-        self::$groups_php->{$toGroup}[$key]['template'] = $startTemplate;
+        self::$groups_template[$toGroup][$key]['cacheName'] = $CacheName;
+        self::$groups_template[$toGroup][$key]['children_group'] = $startGroup;
+        self::$groups_template[$toGroup][$key]['template'] = $startTemplate;
     }
-    private static function existCurrentMainCache()
+    public static function doLoopGroup($groupId, $key, $loop_valueName, $loop_keyName = '')
     {
-        return file_exists(self::getCompiledTplPath(self::$currentMainName));
+        if (!isset(self::$groups_template[$groupId]))
+            throw new Exception("il gruppo contenitore: $groupId non esiste");
+        if (!isset(self::$groups_template[$groupId][$key]))
+            throw new Exception("la chiave : $key alla quale corrisponde il contenuto iterato non esiste");
+        self::$groups_template[$groupId][$key]['foreach']['loop_valueName'] = $loop_valueName;
+        self::$groups_template[$groupId][$key]['foreach']['loop_keyName'] = $loop_keyName;
     }
 
     public static function outputGroup($groupId, $template, $reuse = false, $draw = false)
@@ -636,7 +667,7 @@ abstract class Xtreme
 
     public static function clearCurrentLanguage()
     {
-        self::$languages[self::$country] = new stdClass;
+        self::$languages[self::$country] = array();
     }
 
     public static function clearReadyCompiled()
@@ -646,9 +677,7 @@ abstract class Xtreme
 
     public static function clearGroups()
     {
-        self::$groups_php = new stdClass;
-        self::$groups_html = new stdClass;
-        self::$groups_template = new stdClass;
+        self::$groups_template = array();
     }
 
     //----------FILES FUNCTION
@@ -701,10 +730,10 @@ abstract class Xtreme
     private static function save($file, $content)
     {
         $path = substr($file, 0, strrpos($file, DIRECTORY_SEPARATOR, -1));
-        if (!file_exists($path) && mkdir($path, 0755, true) === false)
-            echo "failed to create [$path] directory";
+        if (!file_exists($path) && mkdir($path, self::$filePermission, true) === false)
+            throw new Exception("failed to create [$path] directory");
         if (file_put_contents($file, $content) === false)
-            echo "failed to save [$file]";
+            throw new Exception("failed to save [$file]");
     }
 
     /**
@@ -770,21 +799,30 @@ abstract class Xtreme
     private static function replaceCacheValues($templateName, $key, $value)
     {
         //if the key don't exist in the map then map it
-        if (!isset($self::$readyCompiled[$templateName]['map'][$key]))
+        if (!isset(self::$readyCompiled[$templateName]['map'][$key]))
         {
-            $self::$readyCompiled[$templateName]['map'][$key] = self::getKeyMap(self::$readyCompiled[$templateName]['code'], self::get($key));
+            self::$readyCompiled[$templateName]['map'][$key] = self::getKeyMap(self::$readyCompiled[$templateName]['code'], self::get($key));
         }
         //replacing
-        foreach ($self::$readyCompiled[$templateName]['map'][$key] as $position)
+        foreach (self::$readyCompiled[$templateName]['map'][$key] as $position)
         {
-            substr_replace($self::$readyCompiled[$templateName]['code'], $value, $position);
+            $tmp = substr_replace(self::$readyCompiled[$templateName]['code'], $value, $position);
         }
+        if (!empty(self::$readyCompiled[$templateName]['map'][$key]))
+            self::$readyCompiled[$templateName]['code'] = $tmp;
     }
     private static function getKeyMap($code, $value)
     {
         $positions = array();
         if (empty($value))
             return $positions;
+        //fixing php stupid sense
+        $first = strpos($code, $value);
+        if ($first !== false && $first == 0)
+        {
+            $positions[] = 0;
+        }
+        //end
         while ($pos = strpos($code, $value))
         {
             $positions[] = $pos;
@@ -794,6 +832,7 @@ abstract class Xtreme
     }
     private static function compile($string)
     {
+        self::$hdd_access++;
         $lines = file($string);
         $newLines = array();
         $matches = null;
@@ -825,49 +864,50 @@ abstract class Xtreme
 
     private static function compileGroup($groupId)
     {
-        if (property_exists(self::$groups_html, $groupId))
-            foreach (self::$groups_html->$groupId as $blockId => $html)
-                self::assign($groupId, array($blockId => $html));
-        if (property_exists(self::$groups_php, $groupId))
+        if (isset(self::$groups_template[$groupId]))
         {
-            foreach (self::$groups_php->$groupId as $key => $php)
+            foreach (self::$groups_template[$groupId] as $blockId => $info)
             {
-                self::compileGroup($php['children_group']); //non ritorna nulla
-                self::assign($groupId, array($key => self::compile($php['template'])));
-                unset(self::$groups_php->$groupId[$key]);
+                if (isset($info['children_group']))
+                {
+                    self::compileGroup($info['children_group']);
+                }
+
+                if (isset($info['foreach']))
+                    self::assign($groupId, array($blockId => self::buildForeach(self::compile($info['template']), $blockId, $info['foreach']['loop_valueName'], $info['foreach']['loop_keyName'])));
+                else
+                    self::assign($groupId, array($blockId => self::compile($info['template'])));
+                unset(self::$groups_template[$groupId[$blockId]]);
             }
         }
-        if (property_exists(self::$groups_template, $groupId))
-        {
-            foreach (self::$groups_template->$groupId as $blockId => $templateName)
-            {
-                self::assign($groupId, array($blockId => self::compile(self::getTplPath($templateName))));
-            }
-        }
-
-
+    }
+    private static function buildForeach($compiledCode, $arrayName, $loop_valueName, $loop_keyName)
+    {
+        if (!empty($loop_keyName))
+            return "<?php foreach (self::get('$arrayName') as $$loop_keyName => $loop_valueName) { ?> $compiledCode <?php } ?>";
+        return "<?php foreach (self::get('$arrayName') as $$loop_valueName){ ?> $compiledCode  <?php } ?>";
     }
     private static function getGroupCacheName($groupId, $template)
     {
         $paths = "";
-        if (property_exists(self::$groups_template, $groupId))
-            foreach (self::$groups_template->$groupId as $blockId => $templateName)
-                $paths .= $templateName;
-        if (property_exists(self::$groups_php, $groupId))
-            foreach (self::$groups_php->$groupId as $blockId => $php)
-                $paths .= $php['cacheName'];
+        if (isset(self::$groups_template[$groupId]))
+        {
+            foreach (self::$groups_template[$groupId] as $blockId => $info)
+            {
+                if (isset($info['cacheName']))
+                    $paths .= $info['cacheName'];
+                else
+                    $paths .= $info['template'];
+            }
+        }
         return $template . $paths;
-    }
-    private static function isPartOfCurrentMain($name)
-    {
-        return strpos($name, self::$currentMainName) !== false;
     }
 
     private static function html_compress($html)
     {
         preg_match_all('!(<(?:code|pre).*>[^<]+</(?:code|pre)>)!', $html, $pre);
         $html = preg_replace('!<(?:code|pre).*>[^<]+</(?:code|pre)>!', '#pre#', $html); //ok
-        $html = preg_replace('#<!–[^\[].+–>#', "", $html); //ok
+        $html = preg_replace('#<!â€“[^\[].+â€“>#', "", $html); //ok
         $html = preg_replace('/ {2,}/', ' ', $html); //ok
         $html = str_replace(array('\r', '\n', '\t'), '', $html);
         $html = preg_replace('/>[\s]+</', '><', $html); //ok
@@ -879,12 +919,27 @@ abstract class Xtreme
     }
     private static function replace_callback($args)
     {
-        $parametri = $args[2];
-        $parametri = preg_replace('/([a-zA-Z0-9_]*)\\' . self::$config['arrayLink'] . '/i', '\'$1\',', $parametri);
-        $parametri = preg_replace('/[,]([a-zA-Z0-9_]*[^,])/i', ',\'$1\'', $parametri);
-        if (strpos($parametri, ',') === false)
-            $parametri = "'$parametri'";
-        return $args[1] . 'self::get(' . $parametri . ')';
+        $function_before = $args[1];
+        $function_arg = $args[2];
+        $function_arg = preg_replace_callback('/([a-zA-Z0-9_]*)\\' . self::$config['arrayLink'] . '/i', 'self::callback_1', $function_arg);
+        $function_arg = preg_replace_callback('/[,]([a-zA-Z0-9_]*[^,])/i', 'self::callback_2', $function_arg);
+        if (strpos($function_arg, ',') === false)
+            $function_arg = self::single_param_replace($function_arg);
+        return "{$function_before}self::get($function_arg)";
+    }
+    private static function callback_1($args)
+    {
+        return self::single_param_replace($args[1]) . ',';
+    }
+    private static function callback_2($args)
+    {
+        return ',' . self::single_param_replace($args[1]);
+    }
+    private static function single_param_replace($param)
+    {
+        if (!is_numeric($param))
+            return "'$param'";
+        return $param;
     }
 
     private static function transformSyntax($input)
@@ -904,10 +959,15 @@ abstract class Xtreme
             case 'foreach':
                 $pieces = explode(',', $parts[1]);
                 $string = '<?php foreach(' . preg_replace_callback($from, $to, $pieces[0]) . ' as ';
-                $string .= preg_replace_callback($from, $to, $pieces[1]);
+                $string .= '$' . $pieces[1];
                 if (sizeof($pieces) == 3)
-                    $string .= '=>' . preg_replace_callback($from, $to, $pieces[2]);
+                {
+                    $string .= '=>' . '$' . $pieces[2];
+                    self::$fList[$pieces[2]] = $pieces[2];
+                }
                 $string .= ') {  ?>';
+                self::$fList[$pieces[1]] = $pieces[1];
+
                 break;
             case 'end':
             case 'endswitch':
@@ -925,20 +985,37 @@ abstract class Xtreme
             case 'group':
                 $string = self::get($parts[1], $parts[2]);
                 break;
+            case 'loop':
+                $param = explode('.', $parts[1]);
+                $string = self::buildArrayString($param, count($param));
+                $string = "<?php echo $$string ?>";
+                break;
             default:
                 $string = '<?php echo ' . preg_replace_callback($from, $to, $parts[0]) . '; ?>';
                 break;
         }
         return $string;
     }
+
     private static function bufferedOutput($compiledFile)
     {
+        self::$hdd_access++;
         ob_start();
         include ($compiledFile);
         $out = ob_get_clean();
         return $out;
     }
     //--------------------------------------------
+
+    //------------- FUNCTIONS FOR TESTING
+    public static function getHddAccess()
+    {
+        return self::$hdd_access;
+    }
+    public static function keyExist($key)
+    {
+        return isset(self::$languages[self::$country][$key]);
+    }
 }
 
 ?>

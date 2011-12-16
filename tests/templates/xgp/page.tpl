@@ -1,0 +1,9 @@
+<html>
+<head>
+	 {group:main_page:head}
+</head>
+<body>
+    {group:main_page:body}
+    {group:main_page:footer}
+</body>
+</html>
