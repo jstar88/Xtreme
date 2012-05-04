@@ -27,6 +27,8 @@
  * -> internal structure merged from 3 to 1 array for better performance;
  * -> loop in template from php;
  * -> callback structure for the compile task
+ * -> fixed the function that transform array to php code;
+ * -> implemented css and script managment;
  */
 abstract class Xtreme
 {
@@ -48,6 +50,7 @@ abstract class Xtreme
     const DEFAULT_MASTER_LEFT = '{';
     const DEFAULT_MASTER_RIGHT = '}';
     const DEFAULT_ARRAY_LINK = '.';
+    const DEFAULT_ARRAY_MEMBER_SEPARATOR = ',';
     const DEFAULT_LANG_EXTENSION = self::JSON;
     const DEFAULT_LANGCACHE_ARRAYNAME = 'lang';
     const DEFAULT_FILE_PERMISSION = 0755;
@@ -59,6 +62,8 @@ abstract class Xtreme
     private static $readyCompiled;
     private static $hdd_access;
     private static $fList;
+    private static $scripts;
+    private static $csses;
 
     //--------external dependency
     private static $baseDirectory;
@@ -67,6 +72,8 @@ abstract class Xtreme
     private static $langExtension;
     private static $templateExtension;
     private static $templateDirectories;
+    private static $scriptsDirectory;
+    private static $cssesDirectory;
     private static $useCache;
     private static $useCompileCompression;
     private static $config;
@@ -93,13 +100,17 @@ abstract class Xtreme
         self::$groups_template = array();
         self::$useCache = true;
         self::$useCompileCompression = true;
-        self::$config = array('master' => array('left' => self::DEFAULT_MASTER_LEFT, 'right' => self::DEFAULT_MASTER_RIGHT), 'arrayLink' => self::DEFAULT_ARRAY_LINK);
+        self::$config = array('master' => array('left' => self::DEFAULT_MASTER_LEFT, 'right' => self::DEFAULT_MASTER_RIGHT), 'arrayLink' => self::DEFAULT_ARRAY_LINK,'arraySeparator'=>self::DEFAULT_ARRAY_MEMBER_SEPARATOR);
         self::$onInexistenceTag = self::HIDE_TAG;
         self::$country = '';
         self::$languages = array();
         self::$hdd_access = 0;
         self::$fList = array();
         self::$filePermission = self::DEFAULT_FILE_PERMISSION;
+        self::$scriptsDirectory = self::$baseDirectory;
+        self::$csses=self::$baseDirectory;
+        self::$scripts = array('default' => array());
+        self::$csses = array('default' => array());
     }
     //-------------PATH FUNCTIONS---------------
     /**
@@ -150,7 +161,7 @@ abstract class Xtreme
 
     /**
      * Xtreme::sanitizeFoolder()
-     * Function used to sanitize the input foolder. must be like "folder/"
+     * Function used to sanitize the input foolder. must be like "folder/*"
      * 
      * @param mixed $foolder
      * @return null
@@ -164,7 +175,7 @@ abstract class Xtreme
 
     /**
      * Xtreme::sanitizeRoot()
-     * Function used to sanitize the input root. must be like "*rootpath/"
+     * Function used to sanitize the input root. must be like "*rootpath/*"
      * 
      * @param mixed $path
      * @return null
@@ -221,6 +232,12 @@ abstract class Xtreme
     {
         return self::$compileDirectory . self::LANG_CACHE_DIRECTORY . DIRECTORY_SEPARATOR . self::$country . self::fixSeparators($lang) . '.' . strtolower(self::JSON);
     }
+    private static function getCssPath($name){
+        return self::$cssesDirectory.self::fixSeparators($name).'.css';   
+    }
+    private static function getScriptPath($name){
+        return self::$cssesDirectory.self::fixSeparators($name).'.js';   
+    }
     //-----------------------------------------
 
     //-------USER PREFERENCE FUNCTIONS
@@ -263,6 +280,14 @@ abstract class Xtreme
     public static function setTemplatesDirectory($new)
     {
         self::$templateDirectories = self::sanitizePath($new);
+    }
+    public static function setScriptsDirectory($new)
+    {
+        self::$scriptsDirectory = self::sanitizePath($new);
+    }
+    public static function setCssDirectory($new)
+    {
+        self::$cssesDirectory = self::sanitizePath($new);
     }
     /**
      * Xtreme::setTemplateExtension()
@@ -491,6 +516,50 @@ abstract class Xtreme
         else
             self::$languages[self::$country][$key] = $value;
     }
+    public static function addScriptToGroup($script, $id="default")
+    {
+        $completeScript=self::makeScript($script);
+        if (!isset(self::$scripts[self::$country][$id]))
+        {
+            self::$scripts[self::$country][$id][$completeScript] = $completeScript;
+        }
+    }
+    public static function addScriptsToGroup($scripts, $id="default")
+    {
+        foreach ($scripts as $script)
+        {
+            self::addScriptToGroup($script, $id);
+        }
+    }
+    public static function addScriptGroups($groups)
+    {
+        foreach ($groups as $groupID => $scripts)
+        {
+            self::$scripts[self::$country][$groupID] = $scripts;
+        }
+    }
+    public static function addCssToGroup($css, $id="default")
+    {
+        $completeCss=self::makeCss($css);
+        if (!isset(self::$csses[self::$country][$id]))
+        {
+            self::$csses[self::$country][$id][$completeCss] = $completeCss;
+        }
+    }
+    public static function addCssesToGroup($csses, $id="default")
+    {
+        foreach ($csses as $css)
+        {
+            self::addCssToGroup($css, $id);
+        }
+    }
+    public static function addCssGroups($groups)
+    {
+        foreach ($groups as $groupID => $csses)
+        {
+            self::$csses[self::$country][$groupID] = self::makeCss($csses);
+        }
+    }
 
     /**
      * Xtreme::append()
@@ -693,7 +762,7 @@ abstract class Xtreme
     private static function saveAsPHP($path, $array)
     {
         $page = '<?php';
-        $page .= self::transformArrayToPHP($array, '$' . self::$langCacheArrayName);
+        $page .= '$' . self::$langCacheArrayName.self::transformArrayToPHP($array);
         $page .= '?>';
         self::save($path, $page);
     }
@@ -706,17 +775,25 @@ abstract class Xtreme
      * @param mixed $string : the rappresentation of passed array in php code
      * @return null
      */
-    private static function transformArrayToPHP($array, $string)
+    private static function transformArrayToPHP($array)
     {
+        $string .= "array(";
         foreach ($array as $key => $value)
         {
-            $string .= '[\'' . $key . '\']=';
+            $string .=  $key ." => ";
             if (is_array($value))
             {
-                self::transformArrayToPHP($value, $string);
+                $string .= self::transformArrayToPHP($value);
             }
-            $string .= $value . ';';
+            else
+            {
+                $string .= $value;
+            }
+            $string.=",";
         }
+        $string=substr($string,0,-1);
+        $string.=")";
+        return $string;
     }
 
     /**
@@ -986,15 +1063,65 @@ abstract class Xtreme
                 $string = self::get($parts[1], $parts[2]);
                 break;
             case 'loop':
-                $param = explode('.', $parts[1]);
+                $param = explode(self::$config['arrayLink'], $parts[1]);
                 $string = self::buildArrayString($param, count($param));
                 $string = "<?php echo $$string ?>";
+                break;
+            case 'script':
+                if(!isset($parts[1])) $parts[1]='';
+                $string = '<?php echo self::getScripts('.$parts[1].'); ?>';
+                break;
+            case 'css':
+                if(!isset($parts[1])) $parts[1]='';
+                $string = '<?php echo self::getCsses('.$parts[1].'); ?>';
+                break;
+            case 'addScript':
+                $arr=evaluatePhpArray($parts[1]);
+                self::addScriptToGroup($arr,$parts[2]);      
+                break;
+            case 'addCss':  
+                $arr=self::evaluatePhpArray($parts[1]);            
+                self::addCssesToGroup($arr,$parts[2]);    
                 break;
             default:
                 $string = '<?php echo ' . preg_replace_callback($from, $to, $parts[0]) . '; ?>';
                 break;
         }
         return $string;
+    }
+    private static function evaluatePhpArray($string)
+    {
+        return explode($string,self::$config['arraySeparator']);
+    }
+    private static function getCsses($group='')
+    {
+        $string='';
+        if(empty($group)){
+            $group='default';    
+        }
+        foreach(self::$csses[self::$country][$group] as $css){
+                $string.=$css;    
+        }    
+        return $string;
+    }
+    private static function getScripts($group='')
+    {
+        $string='';
+        if(empty($group)){
+            $group='default';    
+        }
+        foreach(self::$scripts[self::$country][$group] as $script){
+                $string.=$script;    
+        }    
+        return $string;
+    }
+    private static function makeCss($lnk){
+        $lnk=self::getCssPath($lnk);
+        return "<link rel=\"stylesheet\" type=\"text/css\" href=\"$lnk\"/>";    
+    }
+    private static function makeScript($lnk){
+        $lnk=self::getScriptPath($lnk);
+        return "<script type=\"text/javascript\" src=\"$lnk\"></script>";    
     }
 
     private static function bufferedOutput($compiledFile)
