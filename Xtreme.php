@@ -34,6 +34,7 @@
  * -> fix few bugs;
  * @version 2.4
  * -> add the possibility to use char "-"  inside a variable name;
+ * -> fix few bugs;
  */
 abstract class Xtreme
 {
@@ -59,6 +60,7 @@ abstract class Xtreme
     const DEFAULT_LANG_EXTENSION = self::JSON;
     const DEFAULT_LANGCACHE_ARRAYNAME = 'lang';
     const DEFAULT_FILE_PERMISSION = 0755;
+    const DEFAULT_COUNTRY = 'english';
 
 
     //--------only internal usage
@@ -107,15 +109,15 @@ abstract class Xtreme
         self::$useCompileCompression = true;
         self::$config = array('master' => array('left' => self::DEFAULT_MASTER_LEFT, 'right' => self::DEFAULT_MASTER_RIGHT), 'arrayLink' => self::DEFAULT_ARRAY_LINK, 'arraySeparator' => self::DEFAULT_ARRAY_MEMBER_SEPARATOR);
         self::$onInexistenceTag = self::HIDE_TAG;
-        self::$country = '';
+        self::$country = self::DEFAULT_COUNTRY;
         self::$languages = array();
         self::$hdd_access = 0;
         self::$fList = array();
         self::$filePermission = self::DEFAULT_FILE_PERMISSION;
         self::$scriptsDirectory = self::$baseDirectory;
         self::$csses = self::$baseDirectory;
-        self::$scripts = array('default' => array());
-        self::$csses = array('default' => array());
+        self::$scripts = array(self::$country =>array('default' => array()));
+        self::$csses = array(self::$country =>array('default' => array()));
     }
     //-------------PATH FUNCTIONS---------------
     /**
@@ -613,7 +615,7 @@ abstract class Xtreme
      * @param bool $draw : if true, output the html in screen.
      * @return html if draw option is set to false, nothing otherwise.
      */
-    public static function output($templates, $reuse = false, $draw = false, $forGroup = false, $groupId = false)
+    public static function output($templates, $reuse = false, $draw = false, $forGroup = false, $groupId = false, $postElaboration = false)
     {
         if (!is_array($templates))
             $templates = explode('|', $templates);
@@ -660,7 +662,8 @@ abstract class Xtreme
             else
                 die('Template (' . $templateFile . ') not found ');
         }
-        $out = self::postElaboration($out);
+        if($postElaboration)
+            $out = self::postElaboration($out);
         if (!$draw)
             return $out;
         echo $out;
