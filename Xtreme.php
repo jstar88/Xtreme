@@ -29,6 +29,9 @@
  * -> callback structure for the compile task
  * -> fixed the function that transform array to php code;
  * -> implemented css and script managment;
+ * @version 2.3
+ * -> automatic css and script collocation
+ * -> fix few bugs
  */
 abstract class Xtreme
 {
@@ -100,7 +103,7 @@ abstract class Xtreme
         self::$groups_template = array();
         self::$useCache = true;
         self::$useCompileCompression = true;
-        self::$config = array('master' => array('left' => self::DEFAULT_MASTER_LEFT, 'right' => self::DEFAULT_MASTER_RIGHT), 'arrayLink' => self::DEFAULT_ARRAY_LINK,'arraySeparator'=>self::DEFAULT_ARRAY_MEMBER_SEPARATOR);
+        self::$config = array('master' => array('left' => self::DEFAULT_MASTER_LEFT, 'right' => self::DEFAULT_MASTER_RIGHT), 'arrayLink' => self::DEFAULT_ARRAY_LINK, 'arraySeparator' => self::DEFAULT_ARRAY_MEMBER_SEPARATOR);
         self::$onInexistenceTag = self::HIDE_TAG;
         self::$country = '';
         self::$languages = array();
@@ -108,7 +111,7 @@ abstract class Xtreme
         self::$fList = array();
         self::$filePermission = self::DEFAULT_FILE_PERMISSION;
         self::$scriptsDirectory = self::$baseDirectory;
-        self::$csses=self::$baseDirectory;
+        self::$csses = self::$baseDirectory;
         self::$scripts = array('default' => array());
         self::$csses = array('default' => array());
     }
@@ -232,11 +235,13 @@ abstract class Xtreme
     {
         return self::$compileDirectory . self::LANG_CACHE_DIRECTORY . DIRECTORY_SEPARATOR . self::$country . self::fixSeparators($lang) . '.' . strtolower(self::JSON);
     }
-    private static function getCssPath($name){
-        return self::$cssesDirectory.self::fixSeparators($name).'.css';   
+    private static function getCssPath($name)
+    {
+        return self::$cssesDirectory . self::fixSeparators($name) . '.css';
     }
-    private static function getScriptPath($name){
-        return self::$cssesDirectory.self::fixSeparators($name).'.js';   
+    private static function getScriptPath($name)
+    {
+        return self::$cssesDirectory . self::fixSeparators($name) . '.js';
     }
     //-----------------------------------------
 
@@ -516,15 +521,15 @@ abstract class Xtreme
         else
             self::$languages[self::$country][$key] = $value;
     }
-    public static function addScriptToGroup($script, $id="default")
+    public static function addScriptToGroup($script, $id = "default")
     {
-        $completeScript=self::makeScript($script);
+        $completeScript = self::makeScript($script);
         if (!isset(self::$scripts[self::$country][$id]))
         {
             self::$scripts[self::$country][$id][$completeScript] = $completeScript;
         }
     }
-    public static function addScriptsToGroup($scripts, $id="default")
+    public static function addScriptsToGroup($scripts, $id = "default")
     {
         foreach ($scripts as $script)
         {
@@ -538,15 +543,15 @@ abstract class Xtreme
             self::$scripts[self::$country][$groupID] = $scripts;
         }
     }
-    public static function addCssToGroup($css, $id="default")
+    public static function addCssToGroup($css, $id = "default")
     {
-        $completeCss=self::makeCss($css);
-        if (!isset(self::$csses[self::$country][$id]))
+        $completeCss = self::makeCss($css);
+        if (!isset(self::$csses[self::$country][$id][$completeCss]))
         {
             self::$csses[self::$country][$id][$completeCss] = $completeCss;
         }
     }
-    public static function addCssesToGroup($csses, $id="default")
+    public static function addCssesToGroup($csses, $id = "default")
     {
         foreach ($csses as $css)
         {
@@ -653,9 +658,19 @@ abstract class Xtreme
             else
                 die('Template (' . $templateFile . ') not found ');
         }
+        $out = self::postElaboration($out);
         if (!$draw)
             return $out;
         echo $out;
+    }
+    //implementare la possibilità di usare i gruppi tipo [css:a]
+    private static function postElaboration($out)
+    {
+        //dynamic css insert
+        $out = substr_replace($out, self::getCsses(), strpos($out, "[css]"), strlen("[css]"));
+        //dynamic script insert
+        $out = substr_replace($out, self::getScripts(), strpos($out, "[js]"), strlen("[js]"));
+        return $out;
     }
     public static function assignForReuse($templateName, $key, $value = null)
     {
@@ -762,7 +777,7 @@ abstract class Xtreme
     private static function saveAsPHP($path, $array)
     {
         $page = '<?php';
-        $page .= '$' . self::$langCacheArrayName.self::transformArrayToPHP($array);
+        $page .= '$' . self::$langCacheArrayName . self::transformArrayToPHP($array);
         $page .= '?>';
         self::save($path, $page);
     }
@@ -777,22 +792,24 @@ abstract class Xtreme
      */
     private static function transformArrayToPHP($array)
     {
-        $string .= "array(";
+        $string = "array(";
         foreach ($array as $key => $value)
         {
-            $string .=  $key ." => ";
+            $string .= $key . " => ";
             if (is_array($value))
             {
                 $string .= self::transformArrayToPHP($value);
             }
             else
             {
+                if (!is_numeric($value))
+                    $value = "'$value'";
                 $string .= $value;
             }
-            $string.=",";
+            $string .= ",";
         }
-        $string=substr($string,0,-1);
-        $string.=")";
+        $string = substr($string, 0, -1);
+        $string .= ")";
         return $string;
     }
 
@@ -1057,7 +1074,7 @@ abstract class Xtreme
                 $string = '<?php break; case ' . preg_replace_callback($from, $to, $parts[1]) . ': ?>';
                 break;
             case 'include':
-                $string = '<?php echo self::output("' . $parts[1] . '"); ?>';
+                $string = "<?php echo self::output('{$parts[1]}'); ?>";
                 break;
             case 'group':
                 $string = self::get($parts[1], $parts[2]);
@@ -1067,21 +1084,31 @@ abstract class Xtreme
                 $string = self::buildArrayString($param, count($param));
                 $string = "<?php echo $$string ?>";
                 break;
+                //-- warning, use at your risk
             case 'script':
-                if(!isset($parts[1])) $parts[1]='';
-                $string = '<?php echo self::getScripts('.$parts[1].'); ?>';
+                if (!isset($parts[1]))
+                    $parts[1] = 'default';
+                $string = "<?php echo self::getScripts('{$parts[1]}'); ?>";
                 break;
             case 'css':
-                if(!isset($parts[1])) $parts[1]='';
-                $string = '<?php echo self::getCsses('.$parts[1].'); ?>';
+                if (!isset($parts[1]))
+                    $parts[1] = 'default';
+                $string = "<?php echo self::getCsses('{$parts[1]}'); ?>";
                 break;
+                //----
             case 'addScript':
-                $arr=evaluatePhpArray($parts[1]);
-                self::addScriptToGroup($arr,$parts[2]);      
+                $arr = self::evaluatePhpArray($parts[1]);
+                $arr = self::transformArrayToPHP($arr);
+                if (!isset($parts[2]))
+                    $parts[2] = 'default';
+                $string = "<?php echo self::addScriptsToGroup($arr,'{$parts[2]}'); ?>";
                 break;
-            case 'addCss':  
-                $arr=self::evaluatePhpArray($parts[1]);            
-                self::addCssesToGroup($arr,$parts[2]);    
+            case 'addCss':
+                $arr = self::evaluatePhpArray($parts[1]);
+                $arr = self::transformArrayToPHP($arr);
+                if (!isset($parts[2]))
+                    $parts[2] = 'default';
+                $string = "<?php echo self::addCssesToGroup($arr,'{$parts[2]}'); ?>";
                 break;
             default:
                 $string = '<?php echo ' . preg_replace_callback($from, $to, $parts[0]) . '; ?>';
@@ -1091,37 +1118,43 @@ abstract class Xtreme
     }
     private static function evaluatePhpArray($string)
     {
-        return explode($string,self::$config['arraySeparator']);
+        return explode(self::$config['arraySeparator'], $string);
     }
-    private static function getCsses($group='')
+    private static function getCsses($group = '')
     {
-        $string='';
-        if(empty($group)){
-            $group='default';    
+        $string = '';
+        if (empty($group))
+        {
+            $group = 'default';
         }
-        foreach(self::$csses[self::$country][$group] as $css){
-                $string.=$css;    
-        }    
+        foreach (self::$csses[self::$country][$group] as $css)
+        {
+            $string .= $css;
+        }
         return $string;
     }
-    private static function getScripts($group='')
+    private static function getScripts($group = '')
     {
-        $string='';
-        if(empty($group)){
-            $group='default';    
+        $string = '';
+        if (empty($group))
+        {
+            $group = 'default';
         }
-        foreach(self::$scripts[self::$country][$group] as $script){
-                $string.=$script;    
-        }    
+        foreach (self::$scripts[self::$country][$group] as $script)
+        {
+            $string .= $script;
+        }
         return $string;
     }
-    private static function makeCss($lnk){
-        $lnk=self::getCssPath($lnk);
-        return "<link rel=\"stylesheet\" type=\"text/css\" href=\"$lnk\"/>";    
+    private static function makeCss($lnk)
+    {
+        $lnk = self::getCssPath($lnk);
+        return "<link rel=\"stylesheet\" type=\"text/css\" href=\"$lnk\"/>\n";
     }
-    private static function makeScript($lnk){
-        $lnk=self::getScriptPath($lnk);
-        return "<script type=\"text/javascript\" src=\"$lnk\"></script>";    
+    private static function makeScript($lnk)
+    {
+        $lnk = self::getScriptPath($lnk);
+        return "<script type=\"text/javascript\" src=\"$lnk\"></script>\n";
     }
 
     private static function bufferedOutput($compiledFile)
