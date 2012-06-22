@@ -35,6 +35,8 @@
  * @version 2.4
  * -> add the possibility to use char "-"  inside a variable name;
  * -> fix few bugs;
+ * @version 2.5
+ * -> fix Call-time pass-by-reference;
  */
 abstract class Xtreme
 {
@@ -941,7 +943,8 @@ abstract class Xtreme
 
         foreach ($lines as $line)
         {
-            $num = preg_match_all($regex, $line, &$matches);
+            //deleted & on matches
+            $num = preg_match_all($regex, $line, $matches);
             if ($num > 0)
             {
                 for ($i = 0; $i < $num; $i++)
