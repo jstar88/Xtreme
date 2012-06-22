@@ -30,8 +30,10 @@
  * -> fixed the function that transform array to php code;
  * -> implemented css and script managment;
  * @version 2.3
- * -> automatic css and script collocation
- * -> fix few bugs
+ * -> automatic css and script collocation;
+ * -> fix few bugs;
+ * @version 2.4
+ * -> add the possibility to use char "-"  inside a variable name;
  */
 abstract class Xtreme
 {
@@ -1038,7 +1040,7 @@ abstract class Xtreme
 
     private static function transformSyntax($input)
     {
-        $from = '/(^|\[|,|\(|\+| )([a-zA-Z0-9_\\' . self::$config['arrayLink'] . ']*)($|\.|\)|\[|\]|\+)/';
+        $from = '/(^|\[|,|\(|\+| )([a-zA-Z0-9_\-\\' . self::$config['arrayLink'] . ']*)($|\.|\)|\[|\]|\+)/';
         $to = 'self::replace_callback';
 
         $parts = explode(':', $input);
