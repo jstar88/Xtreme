@@ -831,7 +831,7 @@ abstract class Xtreme
     private static function save($file, $content)
     {
         $path = substr($file, 0, strrpos($file, DIRECTORY_SEPARATOR, -1));
-        if (!file_exists($path) && mkdir($path, self::$filePermission, true) === false)
+        if (!file_exists($path) && @mkdir($path, self::$filePermission, true) === false)
             throw new Exception("failed to create [$path] directory");
         if (file_put_contents($file, $content) === false)
             throw new Exception("failed to save [$file]");
