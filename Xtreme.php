@@ -174,6 +174,8 @@ abstract class Xtreme
     {
         if ($path == '')
             return '';
+        if ($path{0} == DIRECTORY_SEPARATOR)
+            $path = substr($path, 1);
         if (substr($path, -1) != DIRECTORY_SEPARATOR)
             $path .= DIRECTORY_SEPARATOR;
         return $path;
@@ -334,6 +336,14 @@ abstract class Xtreme
     public static function setTemplatesDirectory($new)
     {
         self::$templateDirectory = self::sanitizePath($new);
+    }
+    public static function setTemplateCacheDirectory($new)
+    {
+        self::$templateCacheDirectory= self::sanitizePath($new);
+    }
+    public static function setLangCacheDirectory($new)
+    {
+        self::$langCacheDirectory = self::sanitizePath($new);
     }
     public static function setScriptsDirectory($new)
     {
