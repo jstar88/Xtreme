@@ -37,6 +37,8 @@
  * -> fix few bugs;
  * @version 2.5
  * -> fix Call-time pass-by-reference;
+ * @version 2.6
+ * -> general clean
  */
 abstract class Xtreme
 {
@@ -52,17 +54,32 @@ abstract class Xtreme
     const INI = 'INI';
     //---------------------------
 
-    const TEMPLATE_CACHE_DIRECTORY = 'templates';
-    const LANG_CACHE_DIRECTORY = 'langs';
-    const DEFAULT_TEMPLATE = 'tpl';
+    const DEFAULT_CACHE_PATH = '';
     const DEFAULT_MASTER_LEFT = '{';
     const DEFAULT_MASTER_RIGHT = '}';
     const DEFAULT_ARRAY_LINK = '.';
     const DEFAULT_ARRAY_MEMBER_SEPARATOR = ',';
-    const DEFAULT_LANG_EXTENSION = self::JSON;
-    const DEFAULT_LANGCACHE_ARRAYNAME = 'lang';
     const DEFAULT_FILE_PERMISSION = 0755;
     const DEFAULT_COUNTRY = 'english';
+    const DEFAULT_USE_CACHE = true;
+    const DEFAULT_USE_COMPRESSION = false;
+    const DEFAULT_ON_INEXISTENCE_TAG = self::HIDE_TAG;
+    //tpl
+    const DEFAULT_TEMPLATE_PATH = '';
+    const DEFAULT_TEMPLATE_EXTENSION = 'tpl';
+    const DEFAULT_TEMPLATE_CACHE_PATH = 'templates';
+
+    //lang
+    const DEFAULT_LANG_PATH = '';
+    const DEFAULT_LANG_CACHE_PATH = 'langs';
+    const DEFAULT_LANG_EXTENSION = self::JSON;
+    const DEFAULT_LANGCACHE_ARRAYNAME = 'lang';
+
+    //scripts
+    const DEFAULT_SCRIPTS_PATH = '';
+
+    //css
+    const DEFAULT_CSS_PATH = '';
 
 
     //--------only internal usage
@@ -75,21 +92,30 @@ abstract class Xtreme
     private static $csses;
 
     //--------external dependency
+
+    //general
     private static $baseDirectory;
     private static $compileDirectory;
-    private static $langDirectory;
-    private static $langExtension;
-    private static $templateExtension;
-    private static $templateDirectories;
-    private static $scriptsDirectory;
-    private static $cssesDirectory;
+    private static $country;
     private static $useCache;
     private static $useCompileCompression;
     private static $config;
     private static $onInexistenceTag;
-    private static $country;
-    private static $langCacheArrayName;
     private static $filePermission;
+    //template
+    private static $templateDirectory;
+    private static $templateCacheDirectory;
+    private static $templateExtension;
+    //lang
+    private static $langDirectory;
+    private static $langExtension;
+    private static $langCacheDirectory;
+    private static $langCacheArrayName;
+    //scripts
+    private static $scriptsDirectory;
+    //css
+    private static $cssesDirectory;
+
 
     /**
      * Xtreme::init()
@@ -98,28 +124,43 @@ abstract class Xtreme
      */
     public static function init()
     {
+        //general
         self::$baseDirectory = self::appendSeparator(dirname(__file__));
-        self::$compileDirectory = self::$baseDirectory;
-        self::$templateDirectories = self::$baseDirectory;
-        self::$langDirectory = self::$baseDirectory;
-        self::$templateExtension = self::DEFAULT_TEMPLATE;
+        self::$compileDirectory = self::DEFAULT_CACHE_PATH;
+        self::$country = self::DEFAULT_COUNTRY;
+        self::$useCache = self::DEFAULT_USE_CACHE;
+        self::$useCompileCompression = self::DEFAULT_USE_COMPRESSION;
+        self::$onInexistenceTag = self::DEFAULT_ON_INEXISTENCE_TAG;
+        self::$filePermission = self::DEFAULT_FILE_PERMISSION;
+
+        //template
+        self::$templateDirectory = self::appendSeparator(self::DEFAULT_TEMPLATE_PATH);
+        self::$templateCacheDirectory = self::appendSeparator(self::DEFAULT_TEMPLATE_CACHE_PATH);
+        self::$templateExtension = self::DEFAULT_TEMPLATE_EXTENSION;
+
+        //lang
+        self::$langDirectory = self::appendSeparator(self::DEFAULT_LANG_PATH);
         self::$langExtension = self::DEFAULT_LANG_EXTENSION;
+        self::$langCacheDirectory = self::appendSeparator(self::DEFAULT_LANG_CACHE_PATH);
         self::$langCacheArrayName = self::DEFAULT_LANGCACHE_ARRAYNAME;
+
+        //scripts
+        self::$scriptsDirectory = self::appendSeparator(self::DEFAULT_SCRIPTS_PATH); // non usato
+        self::$scripts = array(self::$country => array('default' => array()));
+
+        //css
+        self::$csses = array(self::$country => array('default' => array()));
+        self::$cssesDirectory = self::appendSeparator(self::DEFAULT_CSS_PATH); // non usato
+
+        self::$config = array(
+            'master' => array('left' => self::DEFAULT_MASTER_LEFT, 'right' => self::DEFAULT_MASTER_RIGHT),
+            'arrayLink' => self::DEFAULT_ARRAY_LINK,
+            'arraySeparator' => self::DEFAULT_ARRAY_MEMBER_SEPARATOR);
         self::$readyCompiled = array();
         self::$groups_template = array();
-        self::$useCache = true;
-        self::$useCompileCompression = true;
-        self::$config = array('master' => array('left' => self::DEFAULT_MASTER_LEFT, 'right' => self::DEFAULT_MASTER_RIGHT), 'arrayLink' => self::DEFAULT_ARRAY_LINK, 'arraySeparator' => self::DEFAULT_ARRAY_MEMBER_SEPARATOR);
-        self::$onInexistenceTag = self::HIDE_TAG;
-        self::$country = self::DEFAULT_COUNTRY;
         self::$languages = array();
         self::$hdd_access = 0;
         self::$fList = array();
-        self::$filePermission = self::DEFAULT_FILE_PERMISSION;
-        self::$scriptsDirectory = self::$baseDirectory;
-        self::$csses = self::$baseDirectory;
-        self::$scripts = array(self::$country =>array('default' => array()));
-        self::$csses = array(self::$country =>array('default' => array()));
     }
     //-------------PATH FUNCTIONS---------------
     /**
@@ -131,6 +172,8 @@ abstract class Xtreme
      */
     private static function appendSeparator($path)
     {
+        if ($path == '')
+            return '';
         if (substr($path, -1) != DIRECTORY_SEPARATOR)
             $path .= DIRECTORY_SEPARATOR;
         return $path;
@@ -143,7 +186,7 @@ abstract class Xtreme
      */
     private static function makeAbsolute($path)
     {
-        return ($path{0} != DIRECTORY_SEPARATOR) ? self::$baseDirectory . $path : $path;
+        return ($path{0} == DIRECTORY_SEPARATOR) ? self::$baseDirectory . $path : $path;
     }
     /**
      * Xtreme::fixSeparators()
@@ -203,7 +246,7 @@ abstract class Xtreme
      */
     private static function getTplPath($template)
     {
-        return self::$templateDirectories . self::fixSeparators($template) . '.' . self::$templateExtension;
+        return self::$baseDirectory . self::$templateDirectory . self::fixSeparators($template) . '.' . self::$templateExtension;
     }
 
     /**
@@ -215,7 +258,7 @@ abstract class Xtreme
      */
     private static function getCompiledTplPath($template)
     {
-        return self::$compileDirectory . self::TEMPLATE_CACHE_DIRECTORY . DIRECTORY_SEPARATOR . self::fixSeparators($template) . '.php';
+        return self::$baseDirectory . self::$compileDirectory . self::$templateCacheDirectory . self::fixSeparators($template) . '.php';
     }
 
     /**
@@ -227,7 +270,7 @@ abstract class Xtreme
      */
     private static function getLangPath($lang)
     {
-        return self::$langDirectory . self::$country . self::fixSeparators($lang) . '.' . strtolower(self::$langExtension);
+        return self::$baseDirectory . self::$langDirectory . self::$country . self::fixSeparators($lang) . '.' . strtolower(self::$langExtension);
     }
 
     /**
@@ -239,15 +282,15 @@ abstract class Xtreme
      */
     private static function getCompiledLangPath($lang)
     {
-        return self::$compileDirectory . self::LANG_CACHE_DIRECTORY . DIRECTORY_SEPARATOR . self::$country . self::fixSeparators($lang) . '.' . strtolower(self::JSON);
+        return self::$baseDirectory . self::$compileDirectory . self::$langCacheDirectory . self::$country . self::fixSeparators($lang) . '.' . strtolower(self::JSON);
     }
     private static function getCssPath($name)
     {
-        return self::$cssesDirectory . self::fixSeparators($name) . '.css';
+        return self::$baseDirectory . self::$cssesDirectory . self::fixSeparators($name) . '.css';
     }
     private static function getScriptPath($name)
     {
-        return self::$cssesDirectory . self::fixSeparators($name) . '.js';
+        return self::$baseDirectory . self::$scriptsDirectory . self::fixSeparators($name) . '.js';
     }
     //-----------------------------------------
 
@@ -290,7 +333,7 @@ abstract class Xtreme
      */
     public static function setTemplatesDirectory($new)
     {
-        self::$templateDirectories = self::sanitizePath($new);
+        self::$templateDirectory = self::sanitizePath($new);
     }
     public static function setScriptsDirectory($new)
     {
@@ -363,23 +406,24 @@ abstract class Xtreme
 
     /**
      * Xtreme::switchCountry()
-     * Function used to switch language foolder.if second param is true then keys in memory of old language will be cleaned.
+     * Function used to switch language foolder.if second param is true then keys in memory of old language will be cleaned;
+     * If third is true then all the keys in target country will be cleaned
      * 
      * @param mixed $country
      * @param bool $cleanOld
      * @return null
      */
-    public static function switchCountry($country, $cleanOld = false)
+    public static function switchCountry($country, $cleanOld = false, $cleanNew = false)
     {
-        $country = self::sanitizeFoolder($country);
-        if ($cleanOld && isset(self::$languages[$country]))
+        $newCountry = self::sanitizeFoolder($country);
+        if ($cleanOld)
         {
-            unset(self::$languages[$country]);
+            unset(self::$languages[self::$country]);
         }
-        self::$country = $country;
-        if (!isset(self::$languages[$country]))
+        self::$country = $newCountry;
+        if (!isset(self::$languages[$newCountry]) || $cleanNew)
         {
-            self::$languages[$country] = array();
+            self::$languages[$newCountry] = array();
         }
     }
 
@@ -481,11 +525,9 @@ abstract class Xtreme
                 $function = "open_" . self::$langExtension;
                 $lang = self::$function($langPath, $phpVars);
                 self::saveAsPHP($langCompiledPath, $lang);
-            }
-            else
+            } else
                 die('Lang (' . $langPath . ') not found ');
-        }
-        else
+        } else
         {
             $lang = self::open_PHP($langPath, $phpVars);
         }
@@ -523,8 +565,7 @@ abstract class Xtreme
             {
                 self::$languages[self::$country][$key][$k] = $v;
             }
-        }
-        else
+        } else
             self::$languages[self::$country][$key] = $value;
     }
     public static function addScriptToGroup($script, $id = "default")
@@ -629,8 +670,7 @@ abstract class Xtreme
                 $templateName = self::getGroupCacheName($groupId, $template);
                 $compiledTemplateFile = self::getCompiledTplPath(md5($templateName));
                 $templateFile = self::getTplPath($template);
-            }
-            else
+            } else
             {
                 $compiledTemplateFile = self::getCompiledTplPath($template);
                 $templateFile = self::getTplPath($template);
@@ -660,11 +700,10 @@ abstract class Xtreme
                 {
                     self::$readyCompiled[$compiledTemplateFile]['code'] = $tmp;
                 }
-            }
-            else
+            } else
                 die('Template (' . $templateFile . ') not found ');
         }
-        if($postElaboration)
+        if ($postElaboration)
             $out = self::postElaboration($out);
         if (!$draw)
             return $out;
@@ -687,8 +726,7 @@ abstract class Xtreme
         if (!isset(self::$readyCompiled[$templateName]))
         {
             self::assign($key, $value);
-        }
-        else
+        } else
         {
             if (is_array($key))
             {
@@ -702,8 +740,7 @@ abstract class Xtreme
             {
                 foreach ($value as $n => $v)
                     self::replaceCacheValues($templateName, $n, $v);
-            }
-            else
+            } else
             {
                 self::replaceCacheValues($templateName, $key, $value);
             }
@@ -727,8 +764,7 @@ abstract class Xtreme
         {
             foreach (get_object_vars($blockId) as $n => $v)
                 self::$groups_template[$groupId][$n]['template'] = self::getTplPath($v);
-        }
-        else
+        } else
         {
             self::$groups_template[$groupId][$blockId]['template'] = self::getTplPath($templateName);
         }
@@ -806,8 +842,7 @@ abstract class Xtreme
             if (is_array($value))
             {
                 $string .= self::transformArrayToPHP($value);
-            }
-            else
+            } else
             {
                 if (!is_numeric($value))
                     $value = "'$value'";
@@ -1011,7 +1046,10 @@ abstract class Xtreme
         $html = preg_replace('!<(?:code|pre).*>[^<]+</(?:code|pre)>!', '#pre#', $html); //ok
         $html = preg_replace('#<!â€“[^\[].+â€“>#', "", $html); //ok
         $html = preg_replace('/ {2,}/', ' ', $html); //ok
-        $html = str_replace(array('\r', '\n', '\t'), '', $html);
+        $html = str_replace(array(
+            '\r',
+            '\n',
+            '\t'), '', $html);
         $html = preg_replace('/>[\s]+</', '><', $html); //ok
         if (!empty($pre[0]))
             foreach ($pre[0] as $tag)
