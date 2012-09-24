@@ -67,9 +67,10 @@ class Converter
         else
             return parse_ini_file($this->getSourcePath(),true);            
     } 
-    private function save_php($value)
+    private function save_php($value,$name='')
     {
-        //not implemented          
+        $name= empty($name) ? $this->php_vars[0] : $name;
+        file_put_contents($this->getTargetPath(),"<?php $$name=".  var_export($value,true) ."; ?>");         
     }
     private function save_json($value)
     {

@@ -39,6 +39,9 @@
  * -> fix Call-time pass-by-reference;
  * @version 2.6
  * -> general clean
+ * @version 2.7
+ * -> fix not working post elaboration;
+ * -> fix some secondary bugs;
  */
 abstract class Xtreme
 {
@@ -62,6 +65,7 @@ abstract class Xtreme
     const DEFAULT_FILE_PERMISSION = 0755;
     const DEFAULT_COUNTRY = 'english';
     const DEFAULT_USE_CACHE = true;
+    const DEFAULT_USE_POST_COMPILATION = false;
     const DEFAULT_USE_COMPRESSION = false;
     const DEFAULT_ON_INEXISTENCE_TAG = self::HIDE_TAG;
     //tpl
@@ -99,6 +103,7 @@ abstract class Xtreme
     private static $country;
     private static $useCache;
     private static $useCompileCompression;
+    private static $usePostCompilation;
     private static $config;
     private static $onInexistenceTag;
     private static $filePermission;
@@ -130,6 +135,7 @@ abstract class Xtreme
         self::$country = self::DEFAULT_COUNTRY;
         self::$useCache = self::DEFAULT_USE_CACHE;
         self::$useCompileCompression = self::DEFAULT_USE_COMPRESSION;
+        self::$usePostCompilation = self::DEFAULT_USE_POST_COMPILATION;
         self::$onInexistenceTag = self::DEFAULT_ON_INEXISTENCE_TAG;
         self::$filePermission = self::DEFAULT_FILE_PERMISSION;
 
@@ -313,7 +319,7 @@ abstract class Xtreme
      * @param mixed $new
      * @return null
      */
-    public static function setCachesDirectory($new)
+    public static function setCachesDirectory( $new)
     {
         self::$compileDirectory = self::sanitizePath($new);
     }
@@ -323,7 +329,7 @@ abstract class Xtreme
      * @param mixed $new
      * @return null
      */
-    public static function setLanguagesDirectory($new)
+    public static function setLanguagesDirectory( $new)
     {
         self::$langDirectory = self::sanitizePath($new);
     }
@@ -333,23 +339,23 @@ abstract class Xtreme
      * @param mixed $new
      * @return null
      */
-    public static function setTemplatesDirectory($new)
+    public static function setTemplatesDirectory( $new)
     {
         self::$templateDirectory = self::sanitizePath($new);
     }
-    public static function setTemplateCacheDirectory($new)
+    public static function setTemplateCacheDirectory( $new)
     {
         self::$templateCacheDirectory= self::sanitizePath($new);
     }
-    public static function setLangCacheDirectory($new)
+    public static function setLangCacheDirectory( $new)
     {
         self::$langCacheDirectory = self::sanitizePath($new);
     }
-    public static function setScriptsDirectory($new)
+    public static function setScriptsDirectory( $new)
     {
         self::$scriptsDirectory = self::sanitizePath($new);
     }
-    public static function setCssDirectory($new)
+    public static function setCssDirectory( $new)
     {
         self::$cssesDirectory = self::sanitizePath($new);
     }
@@ -359,7 +365,7 @@ abstract class Xtreme
      * @param mixed $new
      * @return null
      */
-    public static function setTemplateExtension($new)
+    public static function setTemplateExtension( $new)
     {
         self::$templateExtension = ($new{0} == '.') ? substr($new, 1) : $new;
     }
@@ -369,7 +375,7 @@ abstract class Xtreme
      * @param mixed $new
      * @return null
      */
-    public static function setLangExtension($new)
+    public static function setLangExtension( $new)
     {
         self::$langExtension = constant("self::$new");
     }
@@ -379,7 +385,7 @@ abstract class Xtreme
      * @param mixed $new
      * @return null
      */
-    public static function setConfig($new)
+    public static function setConfig(array $new)
     {
         self::$config = $new;
     }
@@ -389,7 +395,7 @@ abstract class Xtreme
      * @param mixed $new
      * @return null
      */
-    public static function setOnInexistenceTagEvent($new)
+    public static function setOnInexistenceTagEvent( $new)
     {
         self::$onInexistenceTag = constant("self::$new");
     }
@@ -399,7 +405,7 @@ abstract class Xtreme
      * @param mixed $status
      * @return null
      */
-    public static function useCache($status)
+    public static function useCache( $status)
     {
         self::$useCache = $status;
     }
@@ -409,9 +415,14 @@ abstract class Xtreme
      * @param mixed $status
      * @return null
      */
-    public static function useCompileCompression($status)
+    public static function useCompileCompression( $status)
     {
         self::$useCompileCompression = $status;
+    }
+    
+    public static function usePostCompilation( $status)
+    {
+        self::$usePostCompilation= $status;
     }
 
     /**
@@ -423,7 +434,7 @@ abstract class Xtreme
      * @param bool $cleanOld
      * @return null
      */
-    public static function switchCountry($country, $cleanOld = false, $cleanNew = false)
+    public static function switchCountry( $country, $cleanOld = false, $cleanNew = false)
     {
         $newCountry = self::sanitizeFoolder($country);
         if ($cleanOld)
@@ -520,7 +531,7 @@ abstract class Xtreme
      * @param mixed $phpVars
      * @return null
      */
-    public static function assignLangFile($path, $phpVars = null)
+    public static function assignLangFile( $path, $phpVars = null)
     {
         $langPath = self::getLangPath($path);
         $langCompiledPath = self::getCompiledLangPath($path);
@@ -578,29 +589,29 @@ abstract class Xtreme
         } else
             self::$languages[self::$country][$key] = $value;
     }
-    public static function addScriptToGroup($script, $id = "default")
+    public static function addScriptToGroup( $script, $id = "default")
     {
         $completeScript = self::makeScript($script);
-        if (!isset(self::$scripts[self::$country][$id]))
+        if (!isset(self::$scripts[self::$country][$id][$completeScript]))
         {
             self::$scripts[self::$country][$id][$completeScript] = $completeScript;
         }
     }
-    public static function addScriptsToGroup($scripts, $id = "default")
+    public static function addScriptsToGroup(array $scripts, $id = "default")
     {
         foreach ($scripts as $script)
         {
             self::addScriptToGroup($script, $id);
         }
     }
-    public static function addScriptGroups($groups)
+    public static function addScriptGroups(array $groups)
     {
         foreach ($groups as $groupID => $scripts)
         {
             self::$scripts[self::$country][$groupID] = $scripts;
         }
     }
-    public static function addCssToGroup($css, $id = "default")
+    public static function addCssToGroup( $css, $id = "default")
     {
         $completeCss = self::makeCss($css);
         if (!isset(self::$csses[self::$country][$id][$completeCss]))
@@ -608,14 +619,14 @@ abstract class Xtreme
             self::$csses[self::$country][$id][$completeCss] = $completeCss;
         }
     }
-    public static function addCssesToGroup($csses, $id = "default")
+    public static function addCssesToGroup(array $csses, $id = "default")
     {
         foreach ($csses as $css)
         {
             self::addCssToGroup($css, $id);
         }
     }
-    public static function addCssGroups($groups)
+    public static function addCssGroups(array $groups)
     {
         foreach ($groups as $groupID => $csses)
         {
@@ -631,7 +642,7 @@ abstract class Xtreme
      * @param string $value
      * @return null
      */
-    public static function append($key, $value = '')
+    public static function append( $key, $value = '')
     {
         if (!isset(self::$languages[self::$country][$key]))
         {
@@ -648,7 +659,7 @@ abstract class Xtreme
      * @param mixed $value
      * @return null
      */
-    public static function push($key, $value = null)
+    public static function push( $key, $value = null)
     {
         if (!isset(self::$languages[self::$country][$key]))
         {
@@ -668,7 +679,7 @@ abstract class Xtreme
      * @param bool $draw : if true, output the html in screen.
      * @return html if draw option is set to false, nothing otherwise.
      */
-    public static function output($templates, $reuse = false, $draw = false, $forGroup = false, $groupId = false, $postElaboration = false)
+    public static function output( $templates, $reuse = false, $draw = false, $forGroup = false, $groupId = false)
     {
         if (!is_array($templates))
             $templates = explode('|', $templates);
@@ -713,7 +724,7 @@ abstract class Xtreme
             } else
                 die('Template (' . $templateFile . ') not found ');
         }
-        if ($postElaboration)
+        if (self::$usePostCompilation)
             $out = self::postElaboration($out);
         if (!$draw)
             return $out;
@@ -723,12 +734,20 @@ abstract class Xtreme
     private static function postElaboration($out)
     {
         //dynamic css insert
-        $out = substr_replace($out, self::getCsses(), strpos($out, "[css]"), strlen("[css]"));
+        $cssPos=strpos($out, "[css]");
+        if($cssPos !== false)
+        {        
+            $out = substr_replace($out, self::getCsses(), $cssPos, strlen("[css]"));
+        }
         //dynamic script insert
-        $out = substr_replace($out, self::getScripts(), strpos($out, "[js]"), strlen("[js]"));
+        $jsPos=strpos($out, "[js]");
+        if($jsPos !== false)
+        {
+            $out = substr_replace($out, self::getScripts(), $jsPos, strlen("[js]"));
+        }
         return $out;
     }
-    public static function assignForReuse($templateName, $key, $value = null)
+    public static function assignForReuse( $templateName, $key, $value = null)
     {
         //if cache don't exist then this is a pre-assign
         $templateName = self::getCompiledTplPath($templateName);
@@ -758,7 +777,7 @@ abstract class Xtreme
 
     }
 
-    public static function assignToGroup($groupId, $blockId, $templateName = '')
+    public static function assignToGroup( $groupId, $blockId, $templateName = '')
     {
 
         if (!isset(self::$groups_template[$groupId]))
@@ -779,7 +798,7 @@ abstract class Xtreme
             self::$groups_template[$groupId][$blockId]['template'] = self::getTplPath($templateName);
         }
     }
-    public static function assignGroupToGroup($startGroup, $startTemplate, $toGroup, $key)
+    public static function assignGroupToGroup( $startGroup, $startTemplate, $toGroup, $key)
     {
         $startTemplate = self::getTplPath($startTemplate);
         $CacheName = self::getGroupCacheName($startGroup, $startTemplate);
@@ -787,7 +806,7 @@ abstract class Xtreme
         self::$groups_template[$toGroup][$key]['children_group'] = $startGroup;
         self::$groups_template[$toGroup][$key]['template'] = $startTemplate;
     }
-    public static function doLoopGroup($groupId, $key, $loop_valueName, $loop_keyName = '')
+    public static function doLoopGroup( $groupId, $key,  $loop_valueName, $loop_keyName = '')
     {
         if (!isset(self::$groups_template[$groupId]))
             throw new Exception("il gruppo contenitore: $groupId non esiste");
@@ -797,7 +816,7 @@ abstract class Xtreme
         self::$groups_template[$groupId][$key]['foreach']['loop_keyName'] = $loop_keyName;
     }
 
-    public static function outputGroup($groupId, $template, $reuse = false, $draw = false)
+    public static function outputGroup( $groupId,  $template, $reuse = false, $draw = false)
     {
         return self::output($template, $reuse, $draw, true, $groupId);
     }
@@ -830,7 +849,7 @@ abstract class Xtreme
     private static function saveAsPHP($path, $array)
     {
         $page = '<?php';
-        $page .= '$' . self::$langCacheArrayName . self::transformArrayToPHP($array);
+        $page .= '$' . self::$langCacheArrayName .' = '. self::transformArrayToPHP($array) .';';
         $page .= '?>';
         self::save($path, $page);
     }
@@ -845,24 +864,7 @@ abstract class Xtreme
      */
     private static function transformArrayToPHP($array)
     {
-        $string = "array(";
-        foreach ($array as $key => $value)
-        {
-            $string .= $key . " => ";
-            if (is_array($value))
-            {
-                $string .= self::transformArrayToPHP($value);
-            } else
-            {
-                if (!is_numeric($value))
-                    $value = "'$value'";
-                $string .= $value;
-            }
-            $string .= ",";
-        }
-        $string = substr($string, 0, -1);
-        $string .= ")";
-        return $string;
+        return var_export($array,true);
     }
 
     /**
@@ -1157,14 +1159,14 @@ abstract class Xtreme
                 $arr = self::transformArrayToPHP($arr);
                 if (!isset($parts[2]))
                     $parts[2] = 'default';
-                $string = "<?php echo self::addScriptsToGroup($arr,'{$parts[2]}'); ?>";
+                $string = "<?php self::addScriptsToGroup($arr,'{$parts[2]}'); ?>";
                 break;
             case 'addCss':
                 $arr = self::evaluatePhpArray($parts[1]);
                 $arr = self::transformArrayToPHP($arr);
                 if (!isset($parts[2]))
                     $parts[2] = 'default';
-                $string = "<?php echo self::addCssesToGroup($arr,'{$parts[2]}'); ?>";
+                $string = "<?php self::addCssesToGroup($arr,'{$parts[2]}'); ?>";
                 break;
             default:
                 $string = '<?php echo ' . preg_replace_callback($from, $to, $parts[0]) . '; ?>';

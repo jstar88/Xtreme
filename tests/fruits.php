@@ -9,7 +9,7 @@ Xtreme::setCachesDirectory('tmp');
 Xtreme::setTemplatesDirectory('templates');
 
 $array=array('key1'=>'apple','key2'=>'pear');
-$array2=array('key3'=>'strawberry','key4'=>'plum');
+$array2=array('key3'=>'lemon','key4'=>'orange');
 Xtreme::assign($array);
 Xtreme::assign('key',$array2);
 $html=Xtreme::output('fruits');

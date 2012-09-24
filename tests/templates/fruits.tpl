@@ -4,9 +4,9 @@
 </head>
 
 <body>
-{key1}
-{key2}
-{key.key3}
-{key.key4}
+sweet fruits:
+{key1} , {key2}<br>
+acid fruits:
+{key.key3} , {key.key4}
 </body>
 </html>
