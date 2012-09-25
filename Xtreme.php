@@ -42,6 +42,8 @@
  * @version 2.7
  * -> fix not working post elaboration;
  * -> fix some secondary bugs;
+ * @version 2.8
+ * -> added the possibility to do loop inside template
  */
 abstract class Xtreme
 {
@@ -62,6 +64,7 @@ abstract class Xtreme
     const DEFAULT_MASTER_RIGHT = '}';
     const DEFAULT_ARRAY_LINK = '.';
     const DEFAULT_ARRAY_MEMBER_SEPARATOR = ',';
+    const DEFAULT_FOR_EACH_ASSOCIATION = '=>';
     const DEFAULT_FILE_PERMISSION = 0755;
     const DEFAULT_COUNTRY = 'english';
     const DEFAULT_USE_CACHE = true;
@@ -91,7 +94,6 @@ abstract class Xtreme
     private static $languages;
     private static $readyCompiled;
     private static $hdd_access;
-    private static $fList;
     private static $scripts;
     private static $csses;
 
@@ -161,12 +163,12 @@ abstract class Xtreme
         self::$config = array(
             'master' => array('left' => self::DEFAULT_MASTER_LEFT, 'right' => self::DEFAULT_MASTER_RIGHT),
             'arrayLink' => self::DEFAULT_ARRAY_LINK,
-            'arraySeparator' => self::DEFAULT_ARRAY_MEMBER_SEPARATOR);
+            'arraySeparator' => self::DEFAULT_ARRAY_MEMBER_SEPARATOR,
+            'forEachAssociation' => self::DEFAULT_FOR_EACH_ASSOCIATION);
         self::$readyCompiled = array();
         self::$groups_template = array();
         self::$languages = array();
         self::$hdd_access = 0;
-        self::$fList = array();
     }
     //-------------PATH FUNCTIONS---------------
     /**
@@ -1093,7 +1095,21 @@ abstract class Xtreme
             return "'$param'";
         return $param;
     }
-
+    private static function getForeachMatches($string)
+    {
+        $variableRegex='[a-zA-Z0-9_\-\\' . self::$config['arrayLink'] . ']';
+        $arrayAssign=self::$config['forEachAssociation'];
+        
+        $regex="(\S*$variableRegex*\S*)[\s]*as[\s]*(\S*$variableRegex*\S*)[\s]*[$arrayAssign]*[\s]*(\S*$variableRegex*\S*)";
+        preg_match("/$regex/",$string,$mathes);
+        $count= count($mathes);
+        if( $count < 3 || $count > 4 )
+        {
+            throw new Exception('Syntax error in foreach statment');
+        }
+        array_shift($mathes);
+        return $mathes;
+    }
     private static function transformSyntax($input)
     {
         $from = '/(^|\[|,|\(|\+| )([a-zA-Z0-9_\-\\' . self::$config['arrayLink'] . ']*)($|\.|\)|\[|\]|\+)/';
@@ -1109,16 +1125,17 @@ abstract class Xtreme
                 $string = '<?php ' . $parts[0] . '(' . preg_replace_callback($from, $to, $parts[1]) . ') { ' . ($parts[0] == 'switch' ? 'default: ?>' : ' ?>');
                 break;
             case 'foreach':
-                $pieces = explode(',', $parts[1]);
-                $string = '<?php foreach(' . preg_replace_callback($from, $to, $pieces[0]) . ' as ';
-                $string .= '$' . $pieces[1];
-                if (sizeof($pieces) == 3)
+                $variableNames=self::getForeachMatches($parts[1]);
+                $string = "<?php foreach( self::get('{$variableNames[0]}') as ";
+                if(empty($variableNames[2]))
                 {
-                    $string .= '=>' . '$' . $pieces[2];
-                    self::$fList[$pieces[2]] = $pieces[2];
+                    $string .= '$' . $variableNames[1];    
                 }
-                $string .= ') {  ?>';
-                self::$fList[$pieces[1]] = $pieces[1];
+                else
+                {
+                    $string .= '$' . $variableNames[1]. '=>' . '$' . $variableNames[2];
+                }
+                $string .= ') { ?>';
 
                 break;
             case 'end':
