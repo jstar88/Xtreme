@@ -44,6 +44,9 @@
  * -> fix some secondary bugs;
  * @version 2.8
  * -> added the possibility to do loop inside template
+ * @version 2.9
+ * -> added the possibility to do if statment inside template
+ * -> cleaned some functions
  */
 abstract class Xtreme
 {
@@ -1071,24 +1074,6 @@ abstract class Xtreme
         return $html;
 
     }
-    private static function replace_callback($args)
-    {
-        $function_before = $args[1];
-        $function_arg = $args[2];
-        $function_arg = preg_replace_callback('/([a-zA-Z0-9_]*)\\' . self::$config['arrayLink'] . '/i', 'self::callback_1', $function_arg);
-        $function_arg = preg_replace_callback('/[,]([a-zA-Z0-9_]*[^,])/i', 'self::callback_2', $function_arg);
-        if (strpos($function_arg, ',') === false)
-            $function_arg = self::single_param_replace($function_arg);
-        return "{$function_before}self::get($function_arg)";
-    }
-    private static function callback_1($args)
-    {
-        return self::single_param_replace($args[1]) . ',';
-    }
-    private static function callback_2($args)
-    {
-        return ',' . self::single_param_replace($args[1]);
-    }
     private static function single_param_replace($param)
     {
         if (!is_numeric($param))
@@ -1110,10 +1095,30 @@ abstract class Xtreme
         array_shift($mathes);
         return $mathes;
     }
+    private static function replaceVariables($string)
+    {
+        $arrayLink=self::$config['arrayLink'];
+        $variableRegex = "[\s]+([a-zA-Z]+[\w]*[\\$arrayLink]*[a-zA-Z0-9]*)";
+        $string = " $string";
+        $string=preg_replace_callback("/$variableRegex/", 'self::buildArrayXtremeGet', $string);
+        return $string;     
+    }
+    private static function buildArrayXtremeGet($args)
+    {
+        $string= is_array($args)?$args[1]:$args;
+        $recursiveIndexes=explode(self::$config['arrayLink'],$string);
+        
+        $return='self::get('.self::single_param_replace($recursiveIndexes[0]);
+        array_shift($recursiveIndexes);
+        foreach($recursiveIndexes as $index)
+        {
+            $return .= ",".self::single_param_replace($index);
+        } 
+        $return.=')';
+        return $return;   
+    }
     private static function transformSyntax($input)
     {
-        $from = '/(^|\[|,|\(|\+| )([a-zA-Z0-9_\-\\' . self::$config['arrayLink'] . ']*)($|\.|\)|\[|\]|\+)/';
-        $to = 'self::replace_callback';
 
         $parts = explode(':', $input);
 
@@ -1121,12 +1126,15 @@ abstract class Xtreme
         switch ($parts[0])
         {
             case 'if':
+                $string = '<?php if(' . self::replaceVariables($parts[1]) . '){ ?>';
+                break;    
             case 'switch':
-                $string = '<?php ' . $parts[0] . '(' . preg_replace_callback($from, $to, $parts[1]) . ') { ' . ($parts[0] == 'switch' ? 'default: ?>' : ' ?>');
+                //not implemented
                 break;
             case 'foreach':
                 $variableNames=self::getForeachMatches($parts[1]);
-                $string = "<?php foreach( self::get('{$variableNames[0]}') as ";
+                $iterable=self::buildArrayXtremeGet($variableNames[0]);
+                $string = "<?php foreach( $iterable as ";
                 if(empty($variableNames[2]))
                 {
                     $string .= '$' . $variableNames[1];    
@@ -1146,10 +1154,10 @@ abstract class Xtreme
                 $string = '<?php } else { ?>';
                 break;
             case 'case':
-                $string = '<?php break; case ' . preg_replace_callback($from, $to, $parts[1]) . ': ?>';
+                //not implemented
                 break;
             case 'include':
-                $string = "<?php echo self::output('{$parts[1]}'); ?>";
+                //not implemented
                 break;
             case 'group':
                 $string = self::get($parts[1], $parts[2]);
@@ -1186,7 +1194,7 @@ abstract class Xtreme
                 $string = "<?php self::addCssesToGroup($arr,'{$parts[2]}'); ?>";
                 break;
             default:
-                $string = '<?php echo ' . preg_replace_callback($from, $to, $parts[0]) . '; ?>';
+                $string = '<?php echo ' . self::replaceVariables($parts[0]) . '; ?>';
                 break;
         }
         return $string;

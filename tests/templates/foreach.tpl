@@ -6,7 +6,7 @@
 <body>
 
 {foreach: names as name}
-
+ 
 <a>{loop:name}</a><br />
 
 {end}
