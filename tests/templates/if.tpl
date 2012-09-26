@@ -5,10 +5,14 @@
 
 <body>
 
-{if: numbers.1 +  numbers.2 == 3 }   
+{if: numbers.1 +  numbers.2 == numbers.2 }   
     
-    Right!
+    Wrong!
 
+{elseif: 3 > 2}
+
+    Right!
+    
 {else}
 
     University is not for you

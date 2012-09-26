@@ -47,6 +47,8 @@
  * @version 2.9
  * -> added the possibility to do if statment inside template
  * -> cleaned some functions
+ * @version 3.0
+ * -> added the possibility to do switch,elseif and include inside templates
  */
 abstract class Xtreme
 {
@@ -1129,7 +1131,7 @@ abstract class Xtreme
                 $string = '<?php if(' . self::replaceVariables($parts[1]) . '){ ?>';
                 break;    
             case 'switch':
-                //not implemented
+                $string = '<?php switch ('.self::replaceVariables($parts[1]).') { ?>';
                 break;
             case 'foreach':
                 $variableNames=self::getForeachMatches($parts[1]);
@@ -1153,11 +1155,17 @@ abstract class Xtreme
             case 'else':
                 $string = '<?php } else { ?>';
                 break;
+            case 'elseif':
+                $string = '<?php } elseif ('.self::replaceVariables($parts[1]).') { ?>';
+                break;
             case 'case':
-                //not implemented
+                $string = '<?php break; case '.self::replaceVariables($parts[1]).' : ?>';
                 break;
             case 'include':
-                //not implemented
+                $string = '<?php self::output(\''.$parts[1].'\'); ?>';
+                break;
+            case 'includeNow':
+                $string = '<?php '.self::output($parts[1]).' ?>';
                 break;
             case 'group':
                 $string = self::get($parts[1], $parts[2]);
