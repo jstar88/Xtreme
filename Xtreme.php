@@ -4,8 +4,8 @@
  * Xtreme
  * 
  * @package Xtreme  
- * @author Covolo Nicola
- * @copyright Covolo Nicola
+ * @author jstar88
+ * @copyright jstar88
  * @license GNU v3 *[no profit]
  * @access public
  * @since 2011
